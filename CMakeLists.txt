@@ -9,10 +9,7 @@ endif()
 # NOTES:
 # This is a WZ-specific QuickJS CMake build config
 
-get_filename_component(sourceDirRelFilePath "${CMAKE_CURRENT_SOURCE_DIR}/../../"
-                       REALPATH)
-
-set(CMAKE_MODULE_PATH "${sourceDirRelFilePath}/cmake")
+set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
 
 ##################
 # QuickJS library
