@@ -299,19 +299,21 @@ diff --git a/quickjs.c b/quickjs.c
      }
  
      tag = JS_VALUE_GET_TAG(argv[0]);
-@@ -41906,6 +41943,11 @@ static JSValue js_math_random(JSContext *ctx, JSValueConst this_val,
+@@ -41906,6 +41943,13 @@ static JSValue js_math_random(JSContext *ctx, JSValueConst this_val,
      return __JS_NewFloat64(ctx, u.d - 1.0);
  }
  
 +#if defined(_MSC_VER)
 +  #pragma function (ceil)	// Fix MSVC error C2099: initializer is not a constant
 +  #pragma function (floor)	// Fix MSVC error C2099: initializer is not a constant
++  #pragma function (log2)	// Fix MSVC error C2099: initializer is not a constant
++  #pragma function (log10)	// Fix MSVC error C2099: initializer is not a constant
 +#endif
 +
  static const JSCFunctionListEntry js_math_funcs[] = {
      JS_CFUNC_MAGIC_DEF("min", 2, js_math_min_max, 0 ),
      JS_CFUNC_MAGIC_DEF("max", 2, js_math_min_max, 1 ),
-@@ -47841,7 +47883,11 @@ static const JSCFunctionListEntry js_global_funcs[] = {
+@@ -47841,7 +47885,11 @@ static const JSCFunctionListEntry js_global_funcs[] = {
      JS_CFUNC_MAGIC_DEF("encodeURIComponent", 1, js_global_encodeURI, 1 ),
      JS_CFUNC_DEF("escape", 1, js_global_escape ),
      JS_CFUNC_DEF("unescape", 1, js_global_unescape ),
