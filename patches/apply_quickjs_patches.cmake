@@ -61,6 +61,7 @@ quickjs_apply_patches(
 		"007-freeruntime2.patch"
 		"008-msvc-arm64-compat.patch"
 		"009-bswap-netbsd-compat.patch"
+		"010-asan-compatibility.patch"
 )
 
 # Finally, rename VERSION to VERSION.txt
