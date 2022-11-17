@@ -82,7 +82,17 @@
 #define CONFIG_ATOMICS
 #endif
 
-#if !defined(EMSCRIPTEN)
+#if defined(__has_feature)
+  #define QUICKJS_HAS_FEATURE(x) __has_feature(x)
+#else
+  #define QUICKJS_HAS_FEATURE(x) 0
+#endif
+
+#if defined(__SANITIZE_ADDRESS__) || !QUICKJS_HAS_FEATURE(address_sanitizer)
+  #define QUICKJS_HAS_ADDRESS_SANITIZER
+#endif
+
+#if !defined(EMSCRIPTEN) && !defined(QUICKJS_HAS_ADDRESS_SANITIZER) && !QUICKJS_HAS_FEATURE(undefined_behavior_sanitizer)
 /* enable stack limitation */
 #define CONFIG_STACK_CHECK
 #endif
