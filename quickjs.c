@@ -88,7 +88,7 @@
   #define QUICKJS_HAS_FEATURE(x) 0
 #endif
 
-#if defined(__SANITIZE_ADDRESS__) || !QUICKJS_HAS_FEATURE(address_sanitizer)
+#if defined(__SANITIZE_ADDRESS__) || QUICKJS_HAS_FEATURE(address_sanitizer)
   #define QUICKJS_HAS_ADDRESS_SANITIZER
 #endif
 
