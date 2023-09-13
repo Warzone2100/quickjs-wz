@@ -59,3 +59,18 @@ JSContext *JS_NewLimitedContext(JSRuntime *rt, const JSLimitedContextOptions* op
 //#endif
 	return ctx;
 }
+
+// Always accessible JS_Eval (even if limited context has eval disabled)
+JSValue JS_Eval_BypassLimitedContext(JSContext *ctx, const char *input, size_t input_len,
+				const char *filename, int eval_flags)
+{
+	int eval_type = eval_flags & JS_EVAL_TYPE_MASK;
+	JSValue ret;
+
+	assert(eval_type == JS_EVAL_TYPE_GLOBAL ||
+		   eval_type == JS_EVAL_TYPE_MODULE);
+
+	ret = __JS_EvalInternal(ctx, ctx->global_obj, input, input_len, filename,
+							  eval_flags, -1);
+	return ret;
+}

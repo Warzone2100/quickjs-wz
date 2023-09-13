@@ -47,6 +47,9 @@ typedef struct JSLimitedContextOptions
 // Constructs a context with a configurable subset of language intrinsics
 JSContext *JS_NewLimitedContext(JSRuntime *rt, const JSLimitedContextOptions* options);
 
+// Always accessible JS_Eval (even if limited context has eval disabled)
+JSValue JS_Eval_BypassLimitedContext(JSContext *ctx, const char *input, size_t input_len, const char *filename, int eval_flags);
+
 #ifdef __cplusplus
 } /* extern "C" { */
 #endif
