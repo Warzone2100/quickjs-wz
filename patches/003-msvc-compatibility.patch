@@ -287,7 +287,7 @@ diff --git a/quickjs.c b/quickjs.c
                  if (is_neg)
                      d = -d;
                  val = JS_NewFloat64(ctx, d);
-@@ -41734,7 +41767,11 @@ static JSValue js_math_min_max(JSContext *ctx, JSValueConst this_val,
+@@ -41759,7 +41792,11 @@ static JSValue js_math_min_max(JSContext *ctx, JSValueConst this_val,
      uint32_t tag;
  
      if (unlikely(argc == 0)) {
@@ -299,7 +299,7 @@ diff --git a/quickjs.c b/quickjs.c
      }
  
      tag = JS_VALUE_GET_TAG(argv[0]);
-@@ -41906,6 +41943,13 @@ static JSValue js_math_random(JSContext *ctx, JSValueConst this_val,
+@@ -41931,6 +41968,13 @@ static JSValue js_math_random(JSContext *ctx, JSValueConst this_val,
      return __JS_NewFloat64(ctx, u.d - 1.0);
  }
  
@@ -313,7 +313,7 @@ diff --git a/quickjs.c b/quickjs.c
  static const JSCFunctionListEntry js_math_funcs[] = {
      JS_CFUNC_MAGIC_DEF("min", 2, js_math_min_max, 0 ),
      JS_CFUNC_MAGIC_DEF("max", 2, js_math_min_max, 1 ),
-@@ -47841,7 +47885,11 @@ static const JSCFunctionListEntry js_global_funcs[] = {
+@@ -47866,7 +47910,11 @@ static const JSCFunctionListEntry js_global_funcs[] = {
      JS_CFUNC_MAGIC_DEF("encodeURIComponent", 1, js_global_encodeURI, 1 ),
      JS_CFUNC_DEF("escape", 1, js_global_escape ),
      JS_CFUNC_DEF("unescape", 1, js_global_unescape ),
