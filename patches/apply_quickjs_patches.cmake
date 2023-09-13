@@ -62,6 +62,7 @@ quickjs_apply_patches(
 		"008-msvc-arm64-compat.patch"
 		"009-bswap-netbsd-compat.patch"
 		"010-asan-compatibility.patch"
+		"011-fix-stack-overflow.patch"
 )
 
 # Finally, rename VERSION to VERSION.txt
