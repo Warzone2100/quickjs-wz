@@ -42,6 +42,7 @@ typedef struct JSLimitedContextOptions
 	int mapSet;
 	int typedArrays;
 	int promise;
+	int bigInt;
 } JSLimitedContextOptions;
 
 // Constructs a context with a configurable subset of language intrinsics
