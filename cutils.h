@@ -1,6 +1,6 @@
 /*
  * C utilities
- * 
+ *
  * Copyright (c) 2017 Fabrice Bellard
  * Copyright (c) 2018 Charlie Gordon
  *
@@ -28,55 +28,14 @@
 #include <stdlib.h>
 #include <inttypes.h>
 
-#if defined(_MSC_VER)
-  #if !defined(NOMINMAX)
-    #define NOMINMAX // For windows.h
-  #endif
-  #include <windows.h>
-  #include <intrin.h>
-#endif
-
 /* set if CPU is big endian */
 #undef WORDS_BIGENDIAN
 
-#if defined(__has_attribute)
-  #define QUICKJS_HAS_ATTRIBUTE(x) __has_attribute(x)
-#else
-  #define QUICKJS_HAS_ATTRIBUTE(x) 0
-  #define __attribute__(x) /* not supported */
-  #define __attribute(x) /* not supported */
-#endif
-
-#if QUICKJS_HAS_ATTRIBUTE(__builtin_expect)
-  #define likely(x)       __builtin_expect(!!(x), 1)
-  #define unlikely(x)     __builtin_expect(!!(x), 0)
-#else
-  #define likely(x)       (x)
-  #define unlikely(x)     (x)
-#endif
-#if QUICKJS_HAS_ATTRIBUTE(always_inline)
-  #define force_inline inline __attribute__((always_inline))
-#elif defined(_MSC_VER)
-  #define force_inline __forceinline
-#else
-  #define force_inline /* not supported */
-#endif
-#if QUICKJS_HAS_ATTRIBUTE(noinline)
-  #define no_inline __attribute__((noinline))
-#elif defined(_MSC_VER)
-  #define no_inline __declspec(noinline)
-#else
-  #define no_inline /* not supported */
-#endif
-#if QUICKJS_HAS_ATTRIBUTE(unused)
-  #define __maybe_unused __attribute__((unused))
-#else
-  #define __maybe_unused /* not supported */
-#endif
-#if defined(_MSC_VER)
-  #include <BaseTsd.h>
-  typedef SSIZE_T ssize_t;
-#endif
+#define likely(x)       __builtin_expect(!!(x), 1)
+#define unlikely(x)     __builtin_expect(!!(x), 0)
+#define force_inline inline __attribute__((always_inline))
+#define no_inline __attribute__((noinline))
+#define __maybe_unused __attribute__((unused))
 
 #define xglue(x, y) x ## y
 #define glue(x, y) xglue(x, y)
@@ -90,6 +49,9 @@
 #define countof(x) (sizeof(x) / sizeof((x)[0]))
 #endif
 
+/* return the pointer of type 'type *' containing 'ptr' as field 'member' */
+#define container_of(ptr, type, member) ((type *)((uint8_t *)(ptr) - offsetof(type, member)))
+
 typedef int BOOL;
 
 #ifndef FALSE
@@ -97,10 +59,6 @@ enum {
     FALSE = 0,
     TRUE = 1,
 };
-#endif
-
-#if defined(_MSC_VER)
-int gettimeofday(struct timeval * tp, struct timezone * tzp);
 #endif
 
 void pstrcpy(char *buf, int buf_size, const char *str);
@@ -159,91 +117,27 @@ static inline int64_t min_int64(int64_t a, int64_t b)
 /* WARNING: undefined if a = 0 */
 static inline int clz32(unsigned int a)
 {
-#if defined(_MSC_VER)
-	unsigned long idx;
-	_BitScanReverse(&idx, a);
-	return 31 ^ idx;
-#else
     return __builtin_clz(a);
-#endif
 }
 
 /* WARNING: undefined if a = 0 */
 static inline int clz64(uint64_t a)
 {
-#if defined(_MSC_VER)
-	unsigned long where;
-	// BitScanReverse scans from MSB to LSB for first set bit.
-	// Returns 0 if no set bit is found.
-#if INTPTR_MAX >= INT64_MAX // 64-bit
-	if (_BitScanReverse64(&where, a))
-	  return (int)(63 - where);
-#else
-	// Scan the high 32 bits.
-	if (_BitScanReverse(&where, (uint32_t)(a >> 32)))
-		return (int)(63 - (where + 32)); // Create a bit offset from the MSB.
-	// Scan the low 32 bits.
-	if (_BitScanReverse(&where, (uint32_t)(a)))
-		return (int)(63 - where);
-#endif
-	return 64; // Undefined Behavior.
-#else
     return __builtin_clzll(a);
-#endif
 }
 
 /* WARNING: undefined if a = 0 */
 static inline int ctz32(unsigned int a)
 {
-#if defined(_MSC_VER)
-	unsigned long idx;
-	_BitScanForward(&idx, a);
-	return 31 ^ idx;
-#else
     return __builtin_ctz(a);
-#endif
 }
 
 /* WARNING: undefined if a = 0 */
 static inline int ctz64(uint64_t a)
 {
-#if defined(_MSC_VER)
-	unsigned long where;
-	// Search from LSB to MSB for first set bit.
-	// Returns zero if no set bit is found.
-#if INTPTR_MAX >= INT64_MAX // 64-bit
-	if (_BitScanForward64(&where, a))
-		return (int)(where);
-#else
-	// Win32 doesn't have _BitScanForward64 so emulate it with two 32 bit calls.
-	// Scan the Low Word.
-	if (_BitScanForward(&where, (uint32_t)(a)))
-		return (int)(where);
-	// Scan the High Word.
-	if (_BitScanForward(&where, (uint32_t)(a >> 32)))
-		return (int)(where + 32); // Create a bit offset from the LSB.
-#endif
-	return 64;
-#else
     return __builtin_ctzll(a);
-#endif
 }
 
-#if defined(_MSC_VER)
-#pragma pack(push, 1)
-struct packed_u64 {
-	uint64_t v;
-};
-
-struct packed_u32 {
-	uint32_t v;
-};
-
-struct packed_u16 {
-	uint16_t v;
-};
-#pragma pack(pop)
-#else
 struct __attribute__((packed)) packed_u64 {
     uint64_t v;
 };
@@ -255,7 +149,6 @@ struct __attribute__((packed)) packed_u32 {
 struct __attribute__((packed)) packed_u16 {
     uint16_t v;
 };
-#endif
 
 static inline uint64_t get_u64(const uint8_t *tab)
 {
@@ -317,34 +210,28 @@ static inline void put_u8(uint8_t *tab, uint8_t val)
     *tab = val;
 }
 
-#if !defined(HAVE_BSWAP16)
 static inline uint16_t bswap16(uint16_t x)
 {
     return (x >> 8) | (x << 8);
 }
-#endif
 
-#if !defined(HAVE_BSWAP32)
 static inline uint32_t bswap32(uint32_t v)
 {
     return ((v & 0xff000000) >> 24) | ((v & 0x00ff0000) >>  8) |
         ((v & 0x0000ff00) <<  8) | ((v & 0x000000ff) << 24);
 }
-#endif
 
-#if !defined(HAVE_BSWAP64)
 static inline uint64_t bswap64(uint64_t v)
 {
-    return ((v & ((uint64_t)0xff << (7 * 8))) >> (7 * 8)) | 
-        ((v & ((uint64_t)0xff << (6 * 8))) >> (5 * 8)) | 
-        ((v & ((uint64_t)0xff << (5 * 8))) >> (3 * 8)) | 
-        ((v & ((uint64_t)0xff << (4 * 8))) >> (1 * 8)) | 
-        ((v & ((uint64_t)0xff << (3 * 8))) << (1 * 8)) | 
-        ((v & ((uint64_t)0xff << (2 * 8))) << (3 * 8)) | 
-        ((v & ((uint64_t)0xff << (1 * 8))) << (5 * 8)) | 
+    return ((v & ((uint64_t)0xff << (7 * 8))) >> (7 * 8)) |
+        ((v & ((uint64_t)0xff << (6 * 8))) >> (5 * 8)) |
+        ((v & ((uint64_t)0xff << (5 * 8))) >> (3 * 8)) |
+        ((v & ((uint64_t)0xff << (4 * 8))) >> (1 * 8)) |
+        ((v & ((uint64_t)0xff << (3 * 8))) << (1 * 8)) |
+        ((v & ((uint64_t)0xff << (2 * 8))) << (3 * 8)) |
+        ((v & ((uint64_t)0xff << (1 * 8))) << (5 * 8)) |
         ((v & ((uint64_t)0xff << (0 * 8))) << (7 * 8));
 }
-#endif
 
 /* XXX: should take an extra argument to pass slack information to the caller */
 typedef void *DynBufReallocFunc(void *opaque, void *ptr, size_t size);

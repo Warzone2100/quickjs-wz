@@ -16,7 +16,7 @@ set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
 
 set(QUICKJS_HEADERS
 	cutils.h
-#	libbf.h
+	libbf.h
 	libregexp.h
 	libunicode.h
 	list.h
@@ -28,7 +28,7 @@ set(QUICKJS_HEADERS
 
 set(QUICKJS_SOURCES
 	cutils.c
-#	libbf.c
+	libbf.c
 	libregexp.c
 	libunicode.c
 	quickjs.c
