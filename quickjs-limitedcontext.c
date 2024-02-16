@@ -54,9 +54,8 @@ JSContext *JS_NewLimitedContext(JSRuntime *rt, const JSLimitedContextOptions* op
 		JS_AddIntrinsicTypedArrays(ctx);
 	if (options->promise)
 		JS_AddIntrinsicPromise(ctx);
-//#ifdef CONFIG_BIGNUM
-//	JS_AddIntrinsicBigInt(ctx);
-//#endif
+	if (options->bigInt)
+		JS_AddIntrinsicBigInt(ctx);
 	return ctx;
 }
 
