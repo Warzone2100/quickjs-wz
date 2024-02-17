@@ -1,7 +1,7 @@
 diff --git a/quickjs.h b/quickjs.h
 --- a/quickjs.h
 +++ b/quickjs.h
-@@ -222,6 +222,15 @@ typedef struct JSValue {
+@@ -218,6 +218,15 @@ typedef struct JSValue {
  #define JS_MKVAL(tag, val) (JSValue){ (JSValueUnion){ .int32 = val }, tag }
  #define JS_MKPTR(tag, p) (JSValue){ (JSValueUnion){ .ptr = p }, tag }
  
