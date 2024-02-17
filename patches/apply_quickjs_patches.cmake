@@ -54,15 +54,14 @@ quickjs_apply_patches(
 	PATCHES
 		"001-add-extensions.patch"
 		"002-add-disable-atomics-define.patch"
-		"003-msvc-compatibility.patch"
-		"004-fix-pedantic-cxx-warnings.patch"
-		"005-bsd-compile-fixes.patch"
-		"006-msvc-64bit-compatibility.patch"
+		"003-fix-pedantic-cxx-warnings.patch"
+		"004-msvc-compatibility.patch"
+		"005-msvc-compatibility-64bit.patch"
+		"006-msvc-compatibility-pt3.patch"
 		"007-freeruntime2.patch"
-		"008-msvc-arm64-compat.patch"
-		"009-bswap-netbsd-compat.patch"
-		"010-asan-compatibility.patch"
-		"011-fix-stack-overflow.patch"
+		"008-bsd-compile-fixes.patch"
+		"009-asan-compatibility.patch"
+		"010-win32-gmtime-nullcheck.patch"
 )
 
 # Finally, rename VERSION to VERSION.txt

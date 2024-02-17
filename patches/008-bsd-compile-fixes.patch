@@ -1,7 +1,7 @@
 diff --git a/cutils.h b/cutils.h
 --- a/cutils.h
 +++ b/cutils.h
-@@ -317,17 +317,22 @@ static inline void put_u8(uint8_t *tab, uint8_t val)
+@@ -320,17 +320,22 @@ static inline void put_u8(uint8_t *tab, uint8_t val)
      *tab = val;
  }
  
@@ -23,12 +23,24 @@ diff --git a/cutils.h b/cutils.h
 +#if !defined(HAVE_BSWAP64)
  static inline uint64_t bswap64(uint64_t v)
  {
-     return ((v & ((uint64_t)0xff << (7 * 8))) >> (7 * 8)) | 
-@@ -339,6 +344,7 @@ static inline uint64_t bswap64(uint64_t v)
-         ((v & ((uint64_t)0xff << (1 * 8))) << (5 * 8)) | 
+     return ((v & ((uint64_t)0xff << (7 * 8))) >> (7 * 8)) |
+@@ -342,6 +347,7 @@ static inline uint64_t bswap64(uint64_t v)
+         ((v & ((uint64_t)0xff << (1 * 8))) << (5 * 8)) |
          ((v & ((uint64_t)0xff << (0 * 8))) << (7 * 8));
  }
 +#endif
  
  /* XXX: should take an extra argument to pass slack information to the caller */
  typedef void *DynBufReallocFunc(void *opaque, void *ptr, size_t size);
+diff --git a/quickjs.c b/quickjs.c
+--- a/quickjs.c
++++ b/quickjs.c
+@@ -1729,7 +1729,7 @@ static size_t js_def_malloc_usable_size(const void *ptr)
+     return malloc_size(ptr);
+ #elif defined(_WIN32)
+     return _msize((void *)ptr);
+-#elif defined(EMSCRIPTEN)
++#elif defined(EMSCRIPTEN) || defined(__OpenBSD__) || defined(__NetBSD__)
+     return 0;
+ #elif defined(__linux__)
+     return malloc_usable_size((void *)ptr);
