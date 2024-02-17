@@ -3103,9 +3103,15 @@ static int bf_atof_internal(bf_t *r, slimb_t *pexponent,
             expn = -expn;
     }
     if (is_dec) {
+#ifdef USE_BF_DEC
         a->expn = expn + int_len;
         a->sign = is_neg;
         ret = bfdec_normalize_and_round((bfdec_t *)a, prec, flags);
+#else
+        // bfdec_normalize_and_round not available without USE_BF_DEC
+        bf_set_nan(r);
+        ret = BF_ST_MEM_ERROR;
+#endif
     } else if (radix_bits) {
         /* XXX: may overflow */
         if (!is_bin_exp)
