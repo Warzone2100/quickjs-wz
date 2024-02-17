@@ -62,6 +62,7 @@ quickjs_apply_patches(
 		"008-bsd-compile-fixes.patch"
 		"009-asan-compatibility.patch"
 		"010-win32-gmtime-nullcheck.patch"
+		"011-fix-compile-without-bignum.patch"
 )
 
 # Finally, rename VERSION to VERSION.txt
