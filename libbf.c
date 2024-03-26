@@ -136,6 +136,7 @@ static inline slimb_t ceil_div(slimb_t a, slimb_t b)
         return a / b;
 }
 
+#ifdef USE_BF_DEC
 /* b must be >= 1 */
 static inline slimb_t floor_div(slimb_t a, slimb_t b)
 {
@@ -145,6 +146,7 @@ static inline slimb_t floor_div(slimb_t a, slimb_t b)
         return (a - b + 1) / b;
     }
 }
+#endif
 
 /* return r = a modulo b (0 <= r <= b - 1. b must be >= 1 */
 static inline limb_t smod(slimb_t a, slimb_t b)
@@ -309,7 +311,7 @@ int bf_set(bf_t *r, const bf_t *a)
     }
     r->sign = a->sign;
     r->expn = a->expn;
-    memcpy(r->tab, a->tab, a->len * sizeof(limb_t));
+    memcpy_no_ub(r->tab, a->tab, a->len * sizeof(limb_t));
     return 0;
 }
 
@@ -3103,15 +3105,9 @@ static int bf_atof_internal(bf_t *r, slimb_t *pexponent,
             expn = -expn;
     }
     if (is_dec) {
-#ifdef USE_BF_DEC
         a->expn = expn + int_len;
         a->sign = is_neg;
         ret = bfdec_normalize_and_round((bfdec_t *)a, prec, flags);
-#else
-        // bfdec_normalize_and_round not available without USE_BF_DEC
-        bf_set_nan(r);
-        ret = BF_ST_MEM_ERROR;
-#endif
     } else if (radix_bits) {
         /* XXX: may overflow */
         if (!is_bin_exp)

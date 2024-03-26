@@ -31,10 +31,6 @@
 #include "cutils.h"
 #include "libregexp.h"
 
-#if defined(_WIN32)
-#include <malloc.h>
-#endif
-
 /*
   TODO:
 
@@ -70,7 +66,7 @@ typedef struct {
     const uint8_t *buf_end;
     const uint8_t *buf_start;
     int re_flags;
-    BOOL is_utf16;
+    BOOL is_unicode;
     BOOL ignore_case;
     BOOL dotall;
     int capture_count;
@@ -104,6 +100,7 @@ static const REOpCode reopcode_info[REOP_COUNT] = {
 #define RE_HEADER_FLAGS         0
 #define RE_HEADER_CAPTURE_COUNT 1
 #define RE_HEADER_STACK_SIZE    2
+#define RE_HEADER_BYTECODE_LEN  3
 
 #define RE_HEADER_LEN 7
 
@@ -228,16 +225,16 @@ static __maybe_unused void lre_dump_bytecode(const uint8_t *buf,
 
     assert(buf_len >= RE_HEADER_LEN);
 
-    re_flags=  buf[0];
-    bc_len = get_u32(buf + 3);
+    re_flags = lre_get_flags(buf);
+    bc_len = get_u32(buf + RE_HEADER_BYTECODE_LEN);
     assert(bc_len + RE_HEADER_LEN <= buf_len);
     printf("flags: 0x%x capture_count=%d stack_size=%d\n",
-           re_flags, buf[1], buf[2]);
+           re_flags, buf[RE_HEADER_CAPTURE_COUNT], buf[RE_HEADER_STACK_SIZE]);
     if (re_flags & LRE_FLAG_NAMED_GROUPS) {
         const char *p;
         p = (char *)buf + RE_HEADER_LEN + bc_len;
         printf("named groups: ");
-        for(i = 1; i < buf[1]; i++) {
+        for(i = 1; i < buf[RE_HEADER_CAPTURE_COUNT]; i++) {
             if (i != 1)
                 printf(",");
             printf("<%s>", p);
@@ -413,7 +410,7 @@ static int parse_digits(const uint8_t **pp, BOOL allow_overflow)
         p++;
     }
     *pp = p;
-    return (int)v;
+    return v;
 }
 
 static int re_parse_expect(REParseState *s, const uint8_t **pp, int c)
@@ -498,7 +495,7 @@ int lre_parse_escape(const uint8_t **pp, int allow_utf16)
                     }
                     c = (c << 4) | h;
                 }
-                if (c >= 0xd800 && c < 0xdc00 &&
+                if (is_hi_surrogate(c) &&
                     allow_utf16 == 2 && p[0] == '\\' && p[1] == 'u') {
                     /* convert an escaped surrogate pair into a
                        unicode char */
@@ -509,9 +506,9 @@ int lre_parse_escape(const uint8_t **pp, int allow_utf16)
                             break;
                         c1 = (c1 << 4) | h;
                     }
-                    if (i == 4 && c1 >= 0xdc00 && c1 < 0xe000) {
+                    if (i == 4 && is_lo_surrogate(c1)) {
                         p += 6;
-                        c = (((c & 0x3ff) << 10) | (c1 & 0x3ff)) + 0x10000;
+                        c = from_surrogate(c, c1);
                     }
                 }
             }
@@ -700,10 +697,10 @@ static int get_class_atom(REParseState *s, CharRange *cr,
             if ((c >= 'a' && c <= 'z') ||
                 (c >= 'A' && c <= 'Z') ||
                 (((c >= '0' && c <= '9') || c == '_') &&
-                 inclass && !s->is_utf16)) {   /* Annex B.1.4 */
+                 inclass && !s->is_unicode)) {   /* Annex B.1.4 */
                 c &= 0x1f;
                 p++;
-            } else if (s->is_utf16) {
+            } else if (s->is_unicode) {
                 goto invalid_escape;
             } else {
                 /* otherwise return '\' and 'c' */
@@ -714,7 +711,7 @@ static int get_class_atom(REParseState *s, CharRange *cr,
 #ifdef CONFIG_ALL_UNICODE
         case 'p':
         case 'P':
-            if (s->is_utf16) {
+            if (s->is_unicode) {
                 if (parse_unicode_property(s, cr, &p, (c == 'P')))
                     return -1;
                 c = CLASS_RANGE_BASE;
@@ -724,14 +721,14 @@ static int get_class_atom(REParseState *s, CharRange *cr,
 #endif
         default:
             p--;
-            ret = lre_parse_escape(&p, s->is_utf16 * 2);
+            ret = lre_parse_escape(&p, s->is_unicode * 2);
             if (ret >= 0) {
                 c = ret;
             } else {
                 if (ret == -2 && *p != '\0' && strchr("^$\\.*+?()[]{}|/", *p)) {
                     /* always valid to escape these characters */
                     goto normal_char;
-                } else if (s->is_utf16) {
+                } else if (s->is_unicode) {
                 invalid_escape:
                     return re_parse_error(s, "invalid escape sequence in regular expression");
                 } else {
@@ -753,7 +750,7 @@ static int get_class_atom(REParseState *s, CharRange *cr,
         /* normal char */
         if (c >= 128) {
             c = unicode_from_utf8(p, UTF8_CHAR_LEN_MAX, &p);
-            if ((unsigned)c > 0xffff && !s->is_utf16) {
+            if ((unsigned)c > 0xffff && !s->is_unicode) {
                 /* XXX: should handle non BMP-1 code points */
                 return re_parse_error(s, "malformed unicode char");
             }
@@ -815,11 +812,13 @@ static int re_parse_char_class(REParseState *s, const uint8_t **pp)
     cr_init(cr, s->opaque, lre_realloc);
     p = *pp;
     p++;    /* skip '[' */
+
     invert = FALSE;
     if (*p == '^') {
         p++;
         invert = TRUE;
     }
+
     for(;;) {
         if (*p == ']')
             break;
@@ -829,7 +828,7 @@ static int re_parse_char_class(REParseState *s, const uint8_t **pp)
         if (*p == '-' && p[1] != ']') {
             const uint8_t *p0 = p + 1;
             if (c1 >= CLASS_RANGE_BASE) {
-                if (s->is_utf16) {
+                if (s->is_unicode) {
                     cr_free(cr1);
                     goto invalid_class_range;
                 }
@@ -841,7 +840,7 @@ static int re_parse_char_class(REParseState *s, const uint8_t **pp)
                 goto fail;
             if (c2 >= CLASS_RANGE_BASE) {
                 cr_free(cr1);
-                if (s->is_utf16) {
+                if (s->is_unicode) {
                     goto invalid_class_range;
                 }
                 /* Annex B: match '-' character */
@@ -870,7 +869,7 @@ static int re_parse_char_class(REParseState *s, const uint8_t **pp)
         }
     }
     if (s->ignore_case) {
-        if (cr_regexp_canonicalize(cr, s->is_utf16))
+        if (cr_regexp_canonicalize(cr, s->is_unicode))
             goto memory_error;
     }
     if (invert) {
@@ -938,7 +937,7 @@ static BOOL re_need_check_advance(const uint8_t *bc_buf, int bc_buf_len)
         case REOP_backward_back_reference:
             break;
         default:
-            /* safe behvior: we cannot predict the outcome */
+            /* safe behavior: we cannot predict the outcome */
             return TRUE;
         }
         pos += len;
@@ -1007,10 +1006,10 @@ static int re_parse_group_name(char *buf, int buf_size, const uint8_t **pp)
             break;
         } else if (c >= 128) {
             c = unicode_from_utf8(p, UTF8_CHAR_LEN_MAX, &p);
-            if (c >= 0xD800 && c <= 0xDBFF) {
+            if (is_hi_surrogate(c)) {
                 d = unicode_from_utf8(p, UTF8_CHAR_LEN_MAX, &p1);
-                if (d >= 0xDC00 && d <= 0xDFFF) {
-                    c = 0x10000 + 0x400 * (c - 0xD800) + (d - 0xDC00);
+                if (is_lo_surrogate(d)) {
+                    c = from_surrogate(c, d);
                     p = p1;
                 }
             }
@@ -1118,9 +1117,10 @@ static int find_group_name(REParseState *s, const char *name)
     size_t len, name_len;
     int capture_index;
 
-    name_len = strlen(name);
     p = (char *)s->group_names.buf;
+    if (!p) return -1;
     buf_end = (char *)s->group_names.buf + s->group_names.size;
+    name_len = strlen(name);
     capture_index = 1;
     while (p < buf_end) {
         len = strlen(p);
@@ -1165,7 +1165,7 @@ static int re_parse_term(REParseState *s, BOOL is_backward_dir)
             re_emit_op(s, REOP_prev);
         break;
     case '{':
-        if (s->is_utf16) {
+        if (s->is_unicode) {
             return re_parse_error(s, "syntax error");
         } else if (!is_digit(p[1])) {
             /* Annex B: we accept '{' not followed by digits as a
@@ -1217,7 +1217,7 @@ static int re_parse_term(REParseState *s, BOOL is_backward_dir)
             lookahead:
                 /* Annex B allows lookahead to be used as an atom for
                    the quantifiers */
-                if (!s->is_utf16 && !is_backward_lookahead)  {
+                if (!s->is_unicode && !is_backward_lookahead)  {
                     last_atom_start = s->byte_code.size;
                     last_capture_count = s->capture_count;
                 }
@@ -1293,7 +1293,7 @@ static int re_parse_term(REParseState *s, BOOL is_backward_dir)
                     /* annex B: we tolerate invalid group names in non
                        unicode mode if there is no named capture
                        definition */
-                    if (s->is_utf16 || re_has_named_captures(s))
+                    if (s->is_unicode || re_has_named_captures(s))
                         return re_parse_error(s, "expecting group name");
                     else
                         goto parse_class_atom;
@@ -1301,7 +1301,7 @@ static int re_parse_term(REParseState *s, BOOL is_backward_dir)
                 p1 += 3;
                 if (re_parse_group_name(s->u.tmp_buf, sizeof(s->u.tmp_buf),
                                         &p1)) {
-                    if (s->is_utf16 || re_has_named_captures(s))
+                    if (s->is_unicode || re_has_named_captures(s))
                         return re_parse_error(s, "invalid group name");
                     else
                         goto parse_class_atom;
@@ -1312,7 +1312,7 @@ static int re_parse_term(REParseState *s, BOOL is_backward_dir)
                        after (inefficient, but hopefully not common */
                     c = re_parse_captures(s, &dummy_res, s->u.tmp_buf);
                     if (c < 0) {
-                        if (s->is_utf16 || re_has_named_captures(s))
+                        if (s->is_unicode || re_has_named_captures(s))
                             return re_parse_error(s, "group name not defined");
                         else
                             goto parse_class_atom;
@@ -1324,7 +1324,7 @@ static int re_parse_term(REParseState *s, BOOL is_backward_dir)
         case '0':
             p += 2;
             c = 0;
-            if (s->is_utf16) {
+            if (s->is_unicode) {
                 if (is_digit(*p)) {
                     return re_parse_error(s, "invalid decimal escape in regular expression");
                 }
@@ -1346,7 +1346,7 @@ static int re_parse_term(REParseState *s, BOOL is_backward_dir)
 
                 c = parse_digits(&p, FALSE);
                 if (c < 0 || (c >= s->capture_count && c >= re_count_captures(s))) {
-                    if (!s->is_utf16) {
+                    if (!s->is_unicode) {
                         /* Annex B.1.4: accept legacy octal */
                         p = q;
                         if (*p <= '7') {
@@ -1388,7 +1388,7 @@ static int re_parse_term(REParseState *s, BOOL is_backward_dir)
         break;
     case ']':
     case '}':
-        if (s->is_utf16)
+        if (s->is_unicode)
             return re_parse_error(s, "syntax error");
         goto parse_class_atom;
     default:
@@ -1410,7 +1410,7 @@ static int re_parse_term(REParseState *s, BOOL is_backward_dir)
                 return -1;
         } else {
             if (s->ignore_case)
-                c = lre_canonicalize(c, s->is_utf16);
+                c = lre_canonicalize(c, s->is_unicode);
             if (c <= 0xffff)
                 re_emit_op_u16(s, REOP_char, c);
             else
@@ -1446,7 +1446,7 @@ static int re_parse_term(REParseState *s, BOOL is_backward_dir)
                 /* As an extension (see ES6 annex B), we accept '{' not
                    followed by digits as a normal atom */
                 if (!is_digit(p[1])) {
-                    if (s->is_utf16)
+                    if (s->is_unicode)
                         goto invalid_quant_count;
                     break;
                 }
@@ -1465,7 +1465,7 @@ static int re_parse_term(REParseState *s, BOOL is_backward_dir)
                         quant_max = INT32_MAX; /* infinity */
                     }
                 }
-                if (*p != '}' && !s->is_utf16) {
+                if (*p != '}' && !s->is_unicode) {
                     /* Annex B: normal atom if invalid '{' syntax */
                     p = p1;
                     break;
@@ -1757,7 +1757,7 @@ uint8_t *lre_compile(int *plen, char *error_msg, int error_msg_size,
     s->buf_end = s->buf_ptr + buf_len;
     s->buf_start = s->buf_ptr;
     s->re_flags = re_flags;
-    s->is_utf16 = ((re_flags & LRE_FLAG_UTF16) != 0);
+    s->is_unicode = ((re_flags & LRE_FLAG_UNICODE) != 0);
     is_sticky = ((re_flags & LRE_FLAG_STICKY) != 0);
     s->ignore_case = ((re_flags & LRE_FLAG_IGNORECASE) != 0);
     s->dotall = ((re_flags & LRE_FLAG_DOTALL) != 0);
@@ -1815,7 +1815,8 @@ uint8_t *lre_compile(int *plen, char *error_msg, int error_msg_size,
 
     s->byte_code.buf[RE_HEADER_CAPTURE_COUNT] = s->capture_count;
     s->byte_code.buf[RE_HEADER_STACK_SIZE] = stack_size;
-    put_u32(s->byte_code.buf + 3, s->byte_code.size - RE_HEADER_LEN);
+    put_u32(s->byte_code.buf + RE_HEADER_BYTECODE_LEN,
+            s->byte_code.size - RE_HEADER_LEN);
 
     /* add the named groups if needed */
     if (s->group_names.size > (s->capture_count - 1)) {
@@ -1846,93 +1847,86 @@ static BOOL is_word_char(uint32_t c)
             (c == '_'));
 }
 
-#define GET_CHAR(c, cptr, cbuf_end)                                     \
+#define GET_CHAR(c, cptr, cbuf_end, cbuf_type)                          \
     do {                                                                \
         if (cbuf_type == 0) {                                           \
             c = *cptr++;                                                \
         } else {                                                        \
-            uint32_t __c1;                                              \
-            c = *(uint16_t *)cptr;                                      \
-            cptr += 2;                                                  \
-            if (c >= 0xd800 && c < 0xdc00 &&                            \
-                cbuf_type == 2 && cptr < cbuf_end) {                    \
-                __c1 = *(uint16_t *)cptr;                               \
-                if (__c1 >= 0xdc00 && __c1 < 0xe000) {                  \
-                    c = (((c & 0x3ff) << 10) | (__c1 & 0x3ff)) + 0x10000; \
-                    cptr += 2;                                          \
+            const uint16_t *_p = (const uint16_t *)cptr;                \
+            const uint16_t *_end = (const uint16_t *)cbuf_end;          \
+            c = *_p++;                                                  \
+            if (is_hi_surrogate(c) && cbuf_type == 2) {                 \
+                if (_p < _end && is_lo_surrogate(*_p)) {                \
+                    c = from_surrogate(c, *_p++);                       \
+                }                                                       \
+            }                                                           \
+            cptr = (const void *)_p;                                    \
+        }                                                               \
+    } while (0)
+
+#define PEEK_CHAR(c, cptr, cbuf_end, cbuf_type)                         \
+    do {                                                                \
+        if (cbuf_type == 0) {                                           \
+            c = cptr[0];                                                \
+        } else {                                                        \
+            const uint16_t *_p = (const uint16_t *)cptr;                \
+            const uint16_t *_end = (const uint16_t *)cbuf_end;          \
+            c = *_p++;                                                  \
+            if (is_hi_surrogate(c) && cbuf_type == 2) {                 \
+                if (_p < _end && is_lo_surrogate(*_p)) {                \
+                    c = from_surrogate(c, *_p);                         \
                 }                                                       \
             }                                                           \
         }                                                               \
     } while (0)
 
-#define PEEK_CHAR(c, cptr, cbuf_end)             \
-    do {                                         \
-        if (cbuf_type == 0) {                    \
-            c = cptr[0];                         \
-        } else {                                 \
-            uint32_t __c1;                                              \
-            c = ((uint16_t *)cptr)[0];                                  \
-            if (c >= 0xd800 && c < 0xdc00 &&                            \
-                cbuf_type == 2 && (cptr + 2) < cbuf_end) {              \
-                __c1 = ((uint16_t *)cptr)[1];                           \
-                if (__c1 >= 0xdc00 && __c1 < 0xe000) {                  \
-                    c = (((c & 0x3ff) << 10) | (__c1 & 0x3ff)) + 0x10000; \
-                }                                                       \
-            }                                                           \
-        }                                        \
-    } while (0)
-
-#define PEEK_PREV_CHAR(c, cptr, cbuf_start)                 \
-    do {                                         \
-        if (cbuf_type == 0) {                    \
-            c = cptr[-1];                        \
-        } else {                                 \
-            uint32_t __c1;                                              \
-            c = ((uint16_t *)cptr)[-1];                                 \
-            if (c >= 0xdc00 && c < 0xe000 &&                            \
-                cbuf_type == 2 && (cptr - 4) >= cbuf_start) {              \
-                __c1 = ((uint16_t *)cptr)[-2];                          \
-                if (__c1 >= 0xd800 && __c1 < 0xdc00 ) {                 \
-                    c = (((__c1 & 0x3ff) << 10) | (c & 0x3ff)) + 0x10000; \
+#define PEEK_PREV_CHAR(c, cptr, cbuf_start, cbuf_type)                  \
+    do {                                                                \
+        if (cbuf_type == 0) {                                           \
+            c = cptr[-1];                                               \
+        } else {                                                        \
+            const uint16_t *_p = (const uint16_t *)cptr - 1;            \
+            const uint16_t *_start = (const uint16_t *)cbuf_start;      \
+            c = *_p;                                                    \
+            if (is_lo_surrogate(c) && cbuf_type == 2) {                 \
+                if (_p > _start && is_hi_surrogate(_p[-1])) {           \
+                    c = from_surrogate(*--_p, c);                       \
                 }                                                       \
             }                                                           \
         }                                                               \
     } while (0)
 
-#define GET_PREV_CHAR(c, cptr, cbuf_start)       \
-    do {                                         \
-        if (cbuf_type == 0) {                    \
-            cptr--;                              \
-            c = cptr[0];                         \
-        } else {                                 \
-            uint32_t __c1;                                              \
-            cptr -= 2;                                                  \
-            c = ((uint16_t *)cptr)[0];                                 \
-            if (c >= 0xdc00 && c < 0xe000 &&                            \
-                cbuf_type == 2 && cptr > cbuf_start) {                  \
-                __c1 = ((uint16_t *)cptr)[-1];                          \
-                if (__c1 >= 0xd800 && __c1 < 0xdc00 ) {                 \
-                    cptr -= 2;                                          \
-                    c = (((__c1 & 0x3ff) << 10) | (c & 0x3ff)) + 0x10000; \
+#define GET_PREV_CHAR(c, cptr, cbuf_start, cbuf_type)                   \
+    do {                                                                \
+        if (cbuf_type == 0) {                                           \
+            cptr--;                                                     \
+            c = cptr[0];                                                \
+        } else {                                                        \
+            const uint16_t *_p = (const uint16_t *)cptr - 1;            \
+            const uint16_t *_start = (const uint16_t *)cbuf_start;      \
+            c = *_p;                                                    \
+            if (is_lo_surrogate(c) && cbuf_type == 2) {                 \
+                if (_p > _start && is_hi_surrogate(_p[-1])) {           \
+                    c = from_surrogate(*--_p, c);                       \
                 }                                                       \
             }                                                           \
+            cptr = (const void *)_p;                                    \
         }                                                               \
     } while (0)
 
-#define PREV_CHAR(cptr, cbuf_start)       \
-    do {                                  \
-        if (cbuf_type == 0) {             \
-            cptr--;                       \
-        } else {                          \
-            cptr -= 2;                          \
-            if (cbuf_type == 2) {                                       \
-                c = ((uint16_t *)cptr)[0];                              \
-                if (c >= 0xdc00 && c < 0xe000 && cptr > cbuf_start) {   \
-                    c = ((uint16_t *)cptr)[-1];                         \
-                    if (c >= 0xd800 && c < 0xdc00)                      \
-                        cptr -= 2;                                      \
+#define PREV_CHAR(cptr, cbuf_start, cbuf_type)                          \
+    do {                                                                \
+        if (cbuf_type == 0) {                                           \
+            cptr--;                                                     \
+        } else {                                                        \
+            const uint16_t *_p = (const uint16_t *)cptr - 1;            \
+            const uint16_t *_start = (const uint16_t *)cbuf_start;      \
+            if (is_lo_surrogate(*_p) && cbuf_type == 2) {               \
+                if (_p > _start && is_hi_surrogate(_p[-1])) {           \
+                    --_p;                                               \
                 }                                                       \
             }                                                           \
+            cptr = (const void *)_p;                                    \
         }                                                               \
     } while (0)
 
@@ -1963,7 +1957,7 @@ typedef struct {
     int stack_size_max;
     BOOL multi_line;
     BOOL ignore_case;
-    BOOL is_utf16;
+    BOOL is_unicode;
     void *opaque; /* used for stack overflow check */
 
     size_t state_size;
@@ -2072,7 +2066,7 @@ static intptr_t lre_exec_backtrack(REExecContext *s, uint8_t **capture,
                             /* go backward */
                             char_count = get_u32(pc + 12);
                             for(i = 0; i < char_count; i++) {
-                                PREV_CHAR(cptr, s->cbuf);
+                                PREV_CHAR(cptr, s->cbuf, cbuf_type);
                             }
                             pc = (pc + 16) + (int)get_u32(pc);
                             rs->cptr = cptr;
@@ -2107,9 +2101,9 @@ static intptr_t lre_exec_backtrack(REExecContext *s, uint8_t **capture,
         test_char:
             if (cptr >= cbuf_end)
                 goto no_match;
-            GET_CHAR(c, cptr, cbuf_end);
+            GET_CHAR(c, cptr, cbuf_end, cbuf_type);
             if (s->ignore_case) {
-                c = lre_canonicalize(c, s->is_utf16);
+                c = lre_canonicalize(c, s->is_unicode);
             }
             if (val != c)
                 goto no_match;
@@ -2154,7 +2148,7 @@ static intptr_t lre_exec_backtrack(REExecContext *s, uint8_t **capture,
                 break;
             if (!s->multi_line)
                 goto no_match;
-            PEEK_PREV_CHAR(c, cptr, s->cbuf);
+            PEEK_PREV_CHAR(c, cptr, s->cbuf, cbuf_type);
             if (!is_line_terminator(c))
                 goto no_match;
             break;
@@ -2163,21 +2157,21 @@ static intptr_t lre_exec_backtrack(REExecContext *s, uint8_t **capture,
                 break;
             if (!s->multi_line)
                 goto no_match;
-            PEEK_CHAR(c, cptr, cbuf_end);
+            PEEK_CHAR(c, cptr, cbuf_end, cbuf_type);
             if (!is_line_terminator(c))
                 goto no_match;
             break;
         case REOP_dot:
             if (cptr == cbuf_end)
                 goto no_match;
-            GET_CHAR(c, cptr, cbuf_end);
+            GET_CHAR(c, cptr, cbuf_end, cbuf_type);
             if (is_line_terminator(c))
                 goto no_match;
             break;
         case REOP_any:
             if (cptr == cbuf_end)
                 goto no_match;
-            GET_CHAR(c, cptr, cbuf_end);
+            GET_CHAR(c, cptr, cbuf_end, cbuf_type);
             break;
         case REOP_save_start:
         case REOP_save_end:
@@ -2229,14 +2223,14 @@ static intptr_t lre_exec_backtrack(REExecContext *s, uint8_t **capture,
                 if (cptr == s->cbuf) {
                     v1 = FALSE;
                 } else {
-                    PEEK_PREV_CHAR(c, cptr, s->cbuf);
+                    PEEK_PREV_CHAR(c, cptr, s->cbuf, cbuf_type);
                     v1 = is_word_char(c);
                 }
                 /* current char */
                 if (cptr >= cbuf_end) {
                     v2 = FALSE;
                 } else {
-                    PEEK_CHAR(c, cptr, cbuf_end);
+                    PEEK_CHAR(c, cptr, cbuf_end, cbuf_type);
                     v2 = is_word_char(c);
                 }
                 if (v1 ^ v2 ^ (REOP_not_word_boundary - opcode))
@@ -2261,11 +2255,11 @@ static intptr_t lre_exec_backtrack(REExecContext *s, uint8_t **capture,
                     while (cptr1 < cptr1_end) {
                         if (cptr >= cbuf_end)
                             goto no_match;
-                        GET_CHAR(c1, cptr1, cptr1_end);
-                        GET_CHAR(c2, cptr, cbuf_end);
+                        GET_CHAR(c1, cptr1, cptr1_end, cbuf_type);
+                        GET_CHAR(c2, cptr, cbuf_end, cbuf_type);
                         if (s->ignore_case) {
-                            c1 = lre_canonicalize(c1, s->is_utf16);
-                            c2 = lre_canonicalize(c2, s->is_utf16);
+                            c1 = lre_canonicalize(c1, s->is_unicode);
+                            c2 = lre_canonicalize(c2, s->is_unicode);
                         }
                         if (c1 != c2)
                             goto no_match;
@@ -2275,11 +2269,11 @@ static intptr_t lre_exec_backtrack(REExecContext *s, uint8_t **capture,
                     while (cptr1 > cptr1_start) {
                         if (cptr == s->cbuf)
                             goto no_match;
-                        GET_PREV_CHAR(c1, cptr1, cptr1_start);
-                        GET_PREV_CHAR(c2, cptr, s->cbuf);
+                        GET_PREV_CHAR(c1, cptr1, cptr1_start, cbuf_type);
+                        GET_PREV_CHAR(c2, cptr, s->cbuf, cbuf_type);
                         if (s->ignore_case) {
-                            c1 = lre_canonicalize(c1, s->is_utf16);
-                            c2 = lre_canonicalize(c2, s->is_utf16);
+                            c1 = lre_canonicalize(c1, s->is_unicode);
+                            c2 = lre_canonicalize(c2, s->is_unicode);
                         }
                         if (c1 != c2)
                             goto no_match;
@@ -2296,9 +2290,9 @@ static intptr_t lre_exec_backtrack(REExecContext *s, uint8_t **capture,
                 pc += 2;
                 if (cptr >= cbuf_end)
                     goto no_match;
-                GET_CHAR(c, cptr, cbuf_end);
+                GET_CHAR(c, cptr, cbuf_end, cbuf_type);
                 if (s->ignore_case) {
-                    c = lre_canonicalize(c, s->is_utf16);
+                    c = lre_canonicalize(c, s->is_unicode);
                 }
                 idx_min = 0;
                 low = get_u16(pc + 0 * 4);
@@ -2336,9 +2330,9 @@ static intptr_t lre_exec_backtrack(REExecContext *s, uint8_t **capture,
                 pc += 2;
                 if (cptr >= cbuf_end)
                     goto no_match;
-                GET_CHAR(c, cptr, cbuf_end);
+                GET_CHAR(c, cptr, cbuf_end, cbuf_type);
                 if (s->ignore_case) {
-                    c = lre_canonicalize(c, s->is_utf16);
+                    c = lre_canonicalize(c, s->is_unicode);
                 }
                 idx_min = 0;
                 low = get_u32(pc + 0 * 8);
@@ -2368,7 +2362,7 @@ static intptr_t lre_exec_backtrack(REExecContext *s, uint8_t **capture,
             /* go to the previous char */
             if (cptr == s->cbuf)
                 goto no_match;
-            PREV_CHAR(cptr, s->cbuf);
+            PREV_CHAR(cptr, s->cbuf, cbuf_type);
             break;
         case REOP_simple_greedy_quant:
             {
@@ -2427,16 +2421,16 @@ int lre_exec(uint8_t **capture,
     int re_flags, i, alloca_size, ret;
     StackInt *stack_buf;
 
-    re_flags = bc_buf[RE_HEADER_FLAGS];
+    re_flags = lre_get_flags(bc_buf);
     s->multi_line = (re_flags & LRE_FLAG_MULTILINE) != 0;
     s->ignore_case = (re_flags & LRE_FLAG_IGNORECASE) != 0;
-    s->is_utf16 = (re_flags & LRE_FLAG_UTF16) != 0;
+    s->is_unicode = (re_flags & LRE_FLAG_UNICODE) != 0;
     s->capture_count = bc_buf[RE_HEADER_CAPTURE_COUNT];
     s->stack_size_max = bc_buf[RE_HEADER_STACK_SIZE];
     s->cbuf = cbuf;
     s->cbuf_end = cbuf + (clen << cbuf_type);
     s->cbuf_type = cbuf_type;
-    if (s->cbuf_type == 1 && s->is_utf16)
+    if (s->cbuf_type == 1 && s->is_unicode)
         s->cbuf_type = 2;
     s->opaque = opaque;
 
@@ -2474,8 +2468,8 @@ const char *lre_get_groupnames(const uint8_t *bc_buf)
     uint32_t re_bytecode_len;
     if ((lre_get_flags(bc_buf) & LRE_FLAG_NAMED_GROUPS) == 0)
         return NULL;
-    re_bytecode_len = get_u32(bc_buf + 3);
-    return (const char *)(bc_buf + 7 + re_bytecode_len);
+    re_bytecode_len = get_u32(bc_buf + RE_HEADER_BYTECODE_LEN);
+    return (const char *)(bc_buf + RE_HEADER_LEN + re_bytecode_len);
 }
 
 #ifdef TEST
@@ -2492,25 +2486,26 @@ void *lre_realloc(void *opaque, void *ptr, size_t size)
 
 int main(int argc, char **argv)
 {
-    int len, ret, i;
+    int len, flags, ret, i;
     uint8_t *bc;
     char error_msg[64];
     uint8_t *capture[CAPTURE_COUNT_MAX * 2];
     const char *input;
     int input_len, capture_count;
 
-    if (argc < 3) {
-        printf("usage: %s regexp input\n", argv[0]);
-        exit(1);
+    if (argc < 4) {
+        printf("usage: %s regexp flags input\n", argv[0]);
+        return 1;
     }
+    flags = atoi(argv[2]);
     bc = lre_compile(&len, error_msg, sizeof(error_msg), argv[1],
-                     strlen(argv[1]), 0, NULL);
+                     strlen(argv[1]), flags, NULL);
     if (!bc) {
         fprintf(stderr, "error: %s\n", error_msg);
         exit(1);
     }
 
-    input = argv[2];
+    input = argv[3];
     input_len = strlen(input);
 
     ret = lre_exec(capture, bc, (uint8_t *)input, 0, input_len, 0, NULL);

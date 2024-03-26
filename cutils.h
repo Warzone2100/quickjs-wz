@@ -26,57 +26,14 @@
 #define CUTILS_H
 
 #include <stdlib.h>
+#include <string.h>
 #include <inttypes.h>
 
-#if defined(_MSC_VER)
-  #if !defined(NOMINMAX)
-    #define NOMINMAX // For windows.h
-  #endif
-  #include <windows.h>
-  #include <intrin.h>
-#endif
-
-/* set if CPU is big endian */
-#undef WORDS_BIGENDIAN
-
-#if defined(__has_attribute)
-  #define QUICKJS_HAS_ATTRIBUTE(x) __has_attribute(x)
-#else
-  #define QUICKJS_HAS_ATTRIBUTE(x) 0
-  #define __attribute__(x) /* not supported */
-  #define __attribute(x) /* not supported */
-#endif
-
-#if QUICKJS_HAS_ATTRIBUTE(__builtin_expect)
-  #define likely(x)       __builtin_expect(!!(x), 1)
-  #define unlikely(x)     __builtin_expect(!!(x), 0)
-#else
-  #define likely(x)       (x)
-  #define unlikely(x)     (x)
-#endif
-#if QUICKJS_HAS_ATTRIBUTE(always_inline)
-  #define force_inline inline __attribute__((always_inline))
-#elif defined(_MSC_VER)
-  #define force_inline __forceinline
-#else
-  #define force_inline /* not supported */
-#endif
-#if QUICKJS_HAS_ATTRIBUTE(noinline)
-  #define no_inline __attribute__((noinline))
-#elif defined(_MSC_VER)
-  #define no_inline __declspec(noinline)
-#else
-  #define no_inline /* not supported */
-#endif
-#if QUICKJS_HAS_ATTRIBUTE(unused)
-  #define __maybe_unused __attribute__((unused))
-#else
-  #define __maybe_unused /* not supported */
-#endif
-#if defined(_MSC_VER)
-  #include <BaseTsd.h>
-  typedef SSIZE_T ssize_t;
-#endif
+#define likely(x)       __builtin_expect(!!(x), 1)
+#define unlikely(x)     __builtin_expect(!!(x), 0)
+#define force_inline inline __attribute__((always_inline))
+#define no_inline __attribute__((noinline))
+#define __maybe_unused __attribute__((unused))
 
 #define xglue(x, y) x ## y
 #define glue(x, y) xglue(x, y)
@@ -89,9 +46,16 @@
 #ifndef countof
 #define countof(x) (sizeof(x) / sizeof((x)[0]))
 #endif
-
+#ifndef container_of
 /* return the pointer of type 'type *' containing 'ptr' as field 'member' */
 #define container_of(ptr, type, member) ((type *)((uint8_t *)(ptr) - offsetof(type, member)))
+#endif
+
+#if !defined(_MSC_VER) && defined(__STDC_VERSION__) && __STDC_VERSION__ >= 199901L
+#define minimum_length(n)  static n
+#else
+#define minimum_length(n)  n
+#endif
 
 typedef int BOOL;
 
@@ -102,14 +66,16 @@ enum {
 };
 #endif
 
-#if defined(_MSC_VER)
-int gettimeofday(struct timeval * tp, struct timezone * tzp);
-#endif
-
 void pstrcpy(char *buf, int buf_size, const char *str);
 char *pstrcat(char *buf, int buf_size, const char *s);
 int strstart(const char *str, const char *val, const char **ptr);
 int has_suffix(const char *str, const char *suffix);
+
+/* Prevent UB when n == 0 and (src == NULL or dest == NULL) */
+static inline void memcpy_no_ub(void *dest, const void *src, size_t n) {
+    if (n)
+        memcpy(dest, src, n);
+}
 
 static inline int max_int(int a, int b)
 {
@@ -162,91 +128,27 @@ static inline int64_t min_int64(int64_t a, int64_t b)
 /* WARNING: undefined if a = 0 */
 static inline int clz32(unsigned int a)
 {
-#if defined(_MSC_VER)
-	unsigned long idx;
-	_BitScanReverse(&idx, a);
-	return 31 ^ idx;
-#else
     return __builtin_clz(a);
-#endif
 }
 
 /* WARNING: undefined if a = 0 */
 static inline int clz64(uint64_t a)
 {
-#if defined(_MSC_VER)
-	unsigned long where;
-	// BitScanReverse scans from MSB to LSB for first set bit.
-	// Returns 0 if no set bit is found.
-#if INTPTR_MAX >= INT64_MAX // 64-bit
-	if (_BitScanReverse64(&where, a))
-	  return (int)(63 - where);
-#else
-	// Scan the high 32 bits.
-	if (_BitScanReverse(&where, (uint32_t)(a >> 32)))
-		return (int)(63 - (where + 32)); // Create a bit offset from the MSB.
-	// Scan the low 32 bits.
-	if (_BitScanReverse(&where, (uint32_t)(a)))
-		return (int)(63 - where);
-#endif
-	return 64; // Undefined Behavior.
-#else
     return __builtin_clzll(a);
-#endif
 }
 
 /* WARNING: undefined if a = 0 */
 static inline int ctz32(unsigned int a)
 {
-#if defined(_MSC_VER)
-	unsigned long idx;
-	_BitScanForward(&idx, a);
-	return 31 ^ idx;
-#else
     return __builtin_ctz(a);
-#endif
 }
 
 /* WARNING: undefined if a = 0 */
 static inline int ctz64(uint64_t a)
 {
-#if defined(_MSC_VER)
-	unsigned long where;
-	// Search from LSB to MSB for first set bit.
-	// Returns zero if no set bit is found.
-#if INTPTR_MAX >= INT64_MAX // 64-bit
-	if (_BitScanForward64(&where, a))
-		return (int)(where);
-#else
-	// Win32 doesn't have _BitScanForward64 so emulate it with two 32 bit calls.
-	// Scan the Low Word.
-	if (_BitScanForward(&where, (uint32_t)(a)))
-		return (int)(where);
-	// Scan the High Word.
-	if (_BitScanForward(&where, (uint32_t)(a >> 32)))
-		return (int)(where + 32); // Create a bit offset from the LSB.
-#endif
-	return 64;
-#else
     return __builtin_ctzll(a);
-#endif
 }
 
-#if defined(_MSC_VER)
-#pragma pack(push, 1)
-struct packed_u64 {
-	uint64_t v;
-};
-
-struct packed_u32 {
-	uint32_t v;
-};
-
-struct packed_u16 {
-	uint16_t v;
-};
-#pragma pack(pop)
-#else
 struct __attribute__((packed)) packed_u64 {
     uint64_t v;
 };
@@ -258,7 +160,6 @@ struct __attribute__((packed)) packed_u32 {
 struct __attribute__((packed)) packed_u16 {
     uint16_t v;
 };
-#endif
 
 static inline uint64_t get_u64(const uint8_t *tab)
 {
@@ -320,14 +221,14 @@ static inline void put_u8(uint8_t *tab, uint8_t val)
     *tab = val;
 }
 
-#if !defined(HAVE_BSWAP16)
+#ifndef bswap16
 static inline uint16_t bswap16(uint16_t x)
 {
     return (x >> 8) | (x << 8);
 }
 #endif
 
-#if !defined(HAVE_BSWAP32)
+#ifndef bswap32
 static inline uint32_t bswap32(uint32_t v)
 {
     return ((v & 0xff000000) >> 24) | ((v & 0x00ff0000) >>  8) |
@@ -335,7 +236,7 @@ static inline uint32_t bswap32(uint32_t v)
 }
 #endif
 
-#if !defined(HAVE_BSWAP64)
+#ifndef bswap64
 static inline uint64_t bswap64(uint64_t v)
 {
     return ((v & ((uint64_t)0xff << (7 * 8))) >> (7 * 8)) |
@@ -396,6 +297,36 @@ static inline void dbuf_set_error(DynBuf *s)
 
 int unicode_to_utf8(uint8_t *buf, unsigned int c);
 int unicode_from_utf8(const uint8_t *p, int max_len, const uint8_t **pp);
+
+static inline BOOL is_surrogate(uint32_t c)
+{
+    return (c >> 11) == (0xD800 >> 11); // 0xD800-0xDFFF
+}
+
+static inline BOOL is_hi_surrogate(uint32_t c)
+{
+    return (c >> 10) == (0xD800 >> 10); // 0xD800-0xDBFF
+}
+
+static inline BOOL is_lo_surrogate(uint32_t c)
+{
+    return (c >> 10) == (0xDC00 >> 10); // 0xDC00-0xDFFF
+}
+
+static inline uint32_t get_hi_surrogate(uint32_t c)
+{
+    return (c >> 10) - (0x10000 >> 10) + 0xD800;
+}
+
+static inline uint32_t get_lo_surrogate(uint32_t c)
+{
+    return (c & 0x3FF) | 0xDC00;
+}
+
+static inline uint32_t from_surrogate(uint32_t hi, uint32_t lo)
+{
+    return 0x10000 + 0x400 * (hi - 0xD800) + (lo - 0xDC00);
+}
 
 static inline int from_hex(int c)
 {
