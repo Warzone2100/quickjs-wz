@@ -1,7 +1,7 @@
 diff --git a/libbf.c b/libbf.c
 --- a/libbf.c
 +++ b/libbf.c
-@@ -3103,9 +3103,15 @@ static int bf_atof_internal(bf_t *r, slimb_t *pexponent,
+@@ -3105,9 +3105,15 @@ static int bf_atof_internal(bf_t *r, slimb_t *pexponent,
              expn = -expn;
      }
      if (is_dec) {

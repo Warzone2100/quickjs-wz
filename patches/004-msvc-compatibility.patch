@@ -24,10 +24,15 @@ diff --git a/cutils.c b/cutils.c
 diff --git a/cutils.h b/cutils.h
 --- a/cutils.h
 +++ b/cutils.h
-@@ -28,14 +28,55 @@
- #include <stdlib.h>
+@@ -29,11 +29,48 @@
+ #include <string.h>
  #include <inttypes.h>
  
+-#define likely(x)       __builtin_expect(!!(x), 1)
+-#define unlikely(x)     __builtin_expect(!!(x), 0)
+-#define force_inline inline __attribute__((always_inline))
+-#define no_inline __attribute__((noinline))
+-#define __maybe_unused __attribute__((unused))
 +#if defined(_MSC_VER)
 +  #if !defined(NOMINMAX)
 +    #define NOMINMAX // For windows.h
@@ -36,14 +41,6 @@ diff --git a/cutils.h b/cutils.h
 +  #include <intrin.h>
 +#endif
 +
- /* set if CPU is big endian */
- #undef WORDS_BIGENDIAN
- 
--#define likely(x)       __builtin_expect(!!(x), 1)
--#define unlikely(x)     __builtin_expect(!!(x), 0)
--#define force_inline inline __attribute__((always_inline))
--#define no_inline __attribute__((noinline))
--#define __maybe_unused __attribute__((unused))
 +#if defined(__has_attribute)
 +  #define QUICKJS_HAS_ATTRIBUTE(x) __has_attribute(x)
 +#else
@@ -78,14 +75,10 @@ diff --git a/cutils.h b/cutils.h
 +#else
 +  #define __maybe_unused /* not supported */
 +#endif
-+#if defined(_MSC_VER)
-+  #include <BaseTsd.h>
-+  typedef SSIZE_T ssize_t;
-+#endif
  
  #define xglue(x, y) x ## y
  #define glue(x, y) xglue(x, y)
-@@ -61,6 +102,10 @@ enum {
+@@ -66,6 +103,10 @@ enum {
  };
  #endif
  
@@ -96,7 +89,7 @@ diff --git a/cutils.h b/cutils.h
  void pstrcpy(char *buf, int buf_size, const char *str);
  char *pstrcat(char *buf, int buf_size, const char *s);
  int strstart(const char *str, const char *val, const char **ptr);
-@@ -117,27 +162,91 @@ static inline int64_t min_int64(int64_t a, int64_t b)
+@@ -128,27 +169,91 @@ static inline int64_t min_int64(int64_t a, int64_t b)
  /* WARNING: undefined if a = 0 */
  static inline int clz32(unsigned int a)
  {
@@ -188,7 +181,7 @@ diff --git a/cutils.h b/cutils.h
  struct __attribute__((packed)) packed_u64 {
      uint64_t v;
  };
-@@ -149,6 +258,7 @@ struct __attribute__((packed)) packed_u32 {
+@@ -160,6 +265,7 @@ struct __attribute__((packed)) packed_u32 {
  struct __attribute__((packed)) packed_u16 {
      uint16_t v;
  };
@@ -199,7 +192,7 @@ diff --git a/cutils.h b/cutils.h
 diff --git a/libregexp.c b/libregexp.c
 --- a/libregexp.c
 +++ b/libregexp.c
-@@ -409,7 +409,7 @@ static int parse_digits(const uint8_t **pp, BOOL allow_overflow)
+@@ -410,7 +410,7 @@ static int parse_digits(const uint8_t **pp, BOOL allow_overflow)
          p++;
      }
      *pp = p;
@@ -235,7 +228,7 @@ diff --git a/quickjs.c b/quickjs.c
  #define DIRECT_DISPATCH  0
  #else
  #define DIRECT_DISPATCH  1
-@@ -1600,17 +1607,39 @@ static inline BOOL js_check_stack_overflow(JSRuntime *rt, size_t alloca_size)
+@@ -1607,17 +1614,39 @@ static inline BOOL js_check_stack_overflow(JSRuntime *rt, size_t alloca_size)
      return FALSE;
  }
  #else
@@ -275,7 +268,7 @@ diff --git a/quickjs.c b/quickjs.c
  }
  #endif
  
-@@ -10279,7 +10308,11 @@ static JSValue js_atof(JSContext *ctx, const char *str, const char **pp,
+@@ -10286,7 +10315,11 @@ static JSValue js_atof(JSContext *ctx, const char *str, const char **pp,
              } else
  #endif
              {
@@ -287,7 +280,7 @@ diff --git a/quickjs.c b/quickjs.c
                  if (is_neg)
                      d = -d;
                  val = JS_NewFloat64(ctx, d);
-@@ -42978,7 +43011,11 @@ static JSValue js_math_min_max(JSContext *ctx, JSValueConst this_val,
+@@ -43090,7 +43123,11 @@ static JSValue js_math_min_max(JSContext *ctx, JSValueConst this_val,
      uint32_t tag;
  
      if (unlikely(argc == 0)) {
@@ -299,7 +292,7 @@ diff --git a/quickjs.c b/quickjs.c
      }
  
      tag = JS_VALUE_GET_TAG(argv[0]);
-@@ -43150,6 +43187,13 @@ static JSValue js_math_random(JSContext *ctx, JSValueConst this_val,
+@@ -43264,6 +43301,13 @@ static JSValue js_math_random(JSContext *ctx, JSValueConst this_val,
      return __JS_NewFloat64(ctx, u.d - 1.0);
  }
  
@@ -313,7 +306,7 @@ diff --git a/quickjs.c b/quickjs.c
  static const JSCFunctionListEntry js_math_funcs[] = {
      JS_CFUNC_MAGIC_DEF("min", 2, js_math_min_max, 0 ),
      JS_CFUNC_MAGIC_DEF("max", 2, js_math_min_max, 1 ),
-@@ -49301,7 +49345,11 @@ static const JSCFunctionListEntry js_global_funcs[] = {
+@@ -49418,7 +49462,11 @@ static const JSCFunctionListEntry js_global_funcs[] = {
      JS_CFUNC_MAGIC_DEF("encodeURIComponent", 1, js_global_encodeURI, 1 ),
      JS_CFUNC_DEF("escape", 1, js_global_escape ),
      JS_CFUNC_DEF("unescape", 1, js_global_unescape ),
@@ -324,7 +317,7 @@ diff --git a/quickjs.c b/quickjs.c
 +#endif
      JS_PROP_DOUBLE_DEF("NaN", NAN, 0 ),
      JS_PROP_UNDEFINED_DEF("undefined", 0 ),
- };
+     JS_PROP_STRING_DEF("[Symbol.toStringTag]", "global", JS_PROP_CONFIGURABLE ),
 diff --git a/quickjs.h b/quickjs.h
 --- a/quickjs.h
 +++ b/quickjs.h
@@ -340,7 +333,7 @@ diff --git a/quickjs.h b/quickjs.h
  #define __js_printf_like(a, b)
  #endif
  
-@@ -533,9 +537,9 @@ static js_force_inline JSValue JS_NewInt64(JSContext *ctx, int64_t val)
+@@ -536,9 +540,9 @@ static js_force_inline JSValue JS_NewInt64(JSContext *ctx, int64_t val)
  {
      JSValue v;
      if (val == (int32_t)val) {

@@ -1,7 +1,7 @@
 diff --git a/quickjs.c b/quickjs.c
 --- a/quickjs.c
 +++ b/quickjs.c
-@@ -43305,6 +43305,8 @@ static int getTimezoneOffset(int64_t time)
+@@ -43419,6 +43419,8 @@ static int getTimezoneOffset(int64_t time)
          time_t gm_ti, loc_ti;
  
          tm = gmtime(&ti);
