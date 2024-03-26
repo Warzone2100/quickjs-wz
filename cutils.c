@@ -29,10 +29,6 @@
 
 #include "cutils.h"
 
-#if defined(_MSC_VER)
-#include "win32-gettimeofday.c"
-#endif
-
 void pstrcpy(char *buf, int buf_size, const char *str)
 {
     int c;
@@ -144,7 +140,7 @@ int dbuf_put(DynBuf *s, const uint8_t *data, size_t len)
         if (dbuf_realloc(s, s->size + len))
             return -1;
     }
-    memcpy(s->buf + s->size, data, len);
+    memcpy_no_ub(s->buf + s->size, data, len);
     s->size += len;
     return 0;
 }
@@ -301,7 +297,7 @@ int unicode_from_utf8(const uint8_t *p, int max_len, const uint8_t **pp)
             return -1;
         c = (c << 6) | (b & 0x3f);
     }
-    if (c < (int)utf8_min_code[l - 1])
+    if (c < utf8_min_code[l - 1])
         return -1;
     *pp = p;
     return c;

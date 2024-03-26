@@ -40,11 +40,7 @@ extern "C" {
 #else
 #define js_likely(x)     (x)
 #define js_unlikely(x)   (x)
-#if defined(_MSC_VER)
-#define js_force_inline  __forceinline
-#else
 #define js_force_inline  inline
-#endif
 #define __js_printf_like(a, b)
 #endif
 
@@ -105,8 +101,6 @@ typedef struct JSRefCountHeader {
    for objective C) */
 typedef struct __JSValue *JSValue;
 typedef const struct __JSValue *JSValueConst;
-#define JS_VALUE_CONST_CAST(cVal) (JSValue)cVal
-#define JS_VALUE_MAKE_CONST(val) (JSValueConst)val
 
 #define JS_VALUE_GET_TAG(v) (int)((uintptr_t)(v) & 0xf)
 /* same as JS_VALUE_GET_TAG, but return JS_TAG_FLOAT64 with NaN boxing */
@@ -138,8 +132,6 @@ static inline JS_BOOL JS_VALUE_IS_NAN(JSValue v)
 typedef uint64_t JSValue;
 
 #define JSValueConst JSValue
-#define JS_VALUE_CONST_CAST(cVal) cVal
-#define JS_VALUE_MAKE_CONST(val) val
 
 #define JS_VALUE_GET_TAG(v) (int)((v) >> 32)
 #define JS_VALUE_GET_INT(v) (int)(v)
@@ -205,7 +197,7 @@ static inline JS_BOOL JS_VALUE_IS_NAN(JSValue v)
 typedef union JSValueUnion {
     int32_t int32;
     double float64;
-    uintptr_t ptr;
+    void *ptr;
 } JSValueUnion;
 
 typedef struct JSValue {
@@ -214,8 +206,6 @@ typedef struct JSValue {
 } JSValue;
 
 #define JSValueConst JSValue
-#define JS_VALUE_CONST_CAST(cVal) cVal
-#define JS_VALUE_MAKE_CONST(val) val
 
 #define JS_VALUE_GET_TAG(v) ((int32_t)(v).tag)
 /* same as JS_VALUE_GET_TAG, but return JS_TAG_FLOAT64 with NaN boxing */
@@ -223,19 +213,10 @@ typedef struct JSValue {
 #define JS_VALUE_GET_INT(v) ((v).u.int32)
 #define JS_VALUE_GET_BOOL(v) ((v).u.int32)
 #define JS_VALUE_GET_FLOAT64(v) ((v).u.float64)
-#define JS_VALUE_GET_PTR(v) ((void *)((v).u.ptr))
+#define JS_VALUE_GET_PTR(v) ((v).u.ptr)
 
 #define JS_MKVAL(tag, val) (JSValue){ (JSValueUnion){ .int32 = val }, tag }
-#define JS_MKPTR(tag, p) (JSValue){ (JSValueUnion){ .ptr = (uintptr_t)(void *)p }, tag }
-
-#if defined(__cplusplus)
-#undef JS_MKVAL
-#undef JS_MKPTR
-#define with(T, ...)\
-	([&]{ T t{}; __VA_ARGS__; return t; }())
-#define JS_MKVAL(tag, val) JSValue{ with(JSValueUnion, t.int32 = val), tag }
-#define JS_MKPTR(tag, p) JSValue{ with(JSValueUnion, t.ptr = (uintptr_t)(void *)p), tag }
-#endif
+#define JS_MKPTR(tag, p) (JSValue){ (JSValueUnion){ .ptr = p }, tag }
 
 #define JS_TAG_IS_FLOAT64(tag) ((unsigned)(tag) == JS_TAG_FLOAT64)
 
@@ -362,7 +343,6 @@ void JS_SetMaxStackSize(JSRuntime *rt, size_t stack_size);
 void JS_UpdateStackTop(JSRuntime *rt);
 JSRuntime *JS_NewRuntime2(const JSMallocFunctions *mf, void *opaque);
 void JS_FreeRuntime(JSRuntime *rt);
-void JS_FreeRuntime2(JSRuntime *rt, void (*gc_leak_handler)(const char* msg));
 void *JS_GetRuntimeOpaque(JSRuntime *rt);
 void JS_SetRuntimeOpaque(JSRuntime *rt, void *opaque);
 typedef void JS_MarkFunc(JSRuntime *rt, JSGCObjectHeader *gp);
@@ -519,7 +499,10 @@ typedef struct JSClassDef {
     JSClassExoticMethods *exotic;
 } JSClassDef;
 
+#define JS_INVALID_CLASS_ID 0
 JSClassID JS_NewClassID(JSClassID *pclass_id);
+/* Returns the class ID if `v` is an object, otherwise returns JS_INVALID_CLASS_ID. */
+JSClassID JS_GetClassID(JSValue v);
 int JS_NewClass(JSRuntime *rt, JSClassID class_id, const JSClassDef *class_def);
 int JS_IsRegisteredClass(JSRuntime *rt, JSClassID class_id);
 
@@ -544,9 +527,9 @@ static js_force_inline JSValue JS_NewInt64(JSContext *ctx, int64_t val)
 {
     JSValue v;
     if (val == (int32_t)val) {
-        v = JS_NewInt32(ctx, (int32_t)val);
+        v = JS_NewInt32(ctx, val);
     } else {
-        v = __JS_NewFloat64(ctx, (double)val);
+        v = __JS_NewFloat64(ctx, val);
     }
     return v;
 }
@@ -567,23 +550,21 @@ JSValue JS_NewBigUint64(JSContext *ctx, uint64_t v);
 
 static js_force_inline JSValue JS_NewFloat64(JSContext *ctx, double d)
 {
-    JSValue v;
     int32_t val;
     union {
         double d;
         uint64_t u;
     } u, t;
-    u.d = d;
-    val = (int32_t)d;
-    t.d = val;
-    /* -0 cannot be represented as integer, so we compare the bit
-        representation */
-    if (u.u == t.u) {
-        v = JS_MKVAL(JS_TAG_INT, val);
-    } else {
-        v = __JS_NewFloat64(ctx, d);
+    if (d >= INT32_MIN && d <= INT32_MAX) {
+        u.d = d;
+        val = (int32_t)d;
+        t.d = val;
+        /* -0 cannot be represented as integer, so we compare the bit
+           representation */
+        if (u.u == t.u)
+            return JS_MKVAL(JS_TAG_INT, val);
     }
-    return v;
+    return __JS_NewFloat64(ctx, d);
 }
 
 static inline JS_BOOL JS_IsNumber(JSValueConst v)
@@ -689,7 +670,7 @@ static inline JSValue JS_DupValue(JSContext *ctx, JSValueConst v)
         JSRefCountHeader *p = (JSRefCountHeader *)JS_VALUE_GET_PTR(v);
         p->ref_count++;
     }
-    return JS_VALUE_CONST_CAST(v);
+    return (JSValue)v;
 }
 
 static inline JSValue JS_DupValueRT(JSRuntime *rt, JSValueConst v)
@@ -698,7 +679,7 @@ static inline JSValue JS_DupValueRT(JSRuntime *rt, JSValueConst v)
         JSRefCountHeader *p = (JSRefCountHeader *)JS_VALUE_GET_PTR(v);
         p->ref_count++;
     }
-    return JS_VALUE_CONST_CAST(v);
+    return (JSValue)v;
 }
 
 int JS_ToBool(JSContext *ctx, JSValueConst val); /* return -1 for JS_EXCEPTION */
@@ -742,6 +723,8 @@ JS_BOOL JS_SetConstructorBit(JSContext *ctx, JSValueConst func_obj, JS_BOOL val)
 
 JSValue JS_NewArray(JSContext *ctx);
 int JS_IsArray(JSContext *ctx, JSValueConst val);
+
+JSValue JS_NewDate(JSContext *ctx, double epoch_ms);
 
 JSValue JS_GetPropertyInternal(JSContext *ctx, JSValueConst obj,
                                JSAtom prop, JSValueConst receiver,

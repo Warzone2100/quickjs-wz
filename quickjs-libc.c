@@ -1687,7 +1687,7 @@ static JSValue js_os_isatty(JSContext *ctx, JSValueConst this_val,
     int fd;
     if (JS_ToInt32(ctx, &fd, argv[0]))
         return JS_EXCEPTION;
-    return JS_NewBool(ctx, (isatty(fd) != 0));
+    return JS_NewBool(ctx, isatty(fd));
 }
 
 #if defined(_WIN32)
@@ -3527,10 +3527,12 @@ static JSValue js_worker_postMessage(JSContext *ctx, JSValueConst this_val,
     memcpy(msg->data, data, data_len);
     msg->data_len = data_len;
 
-    msg->sab_tab = malloc(sizeof(msg->sab_tab[0]) * sab_tab_len);
-    if (!msg->sab_tab)
-        goto fail;
-    memcpy(msg->sab_tab, sab_tab, sizeof(msg->sab_tab[0]) * sab_tab_len);
+    if (sab_tab_len > 0) {
+        msg->sab_tab = malloc(sizeof(msg->sab_tab[0]) * sab_tab_len);
+        if (!msg->sab_tab)
+            goto fail;
+        memcpy(msg->sab_tab, sab_tab, sizeof(msg->sab_tab[0]) * sab_tab_len);
+    }
     msg->sab_tab_len = sab_tab_len;
 
     js_free(ctx, data);
