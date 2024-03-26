@@ -1,7 +1,7 @@
 diff --git a/quickjs.c b/quickjs.c
 --- a/quickjs.c
 +++ b/quickjs.c
-@@ -55592,3 +55592,6 @@ void JS_AddIntrinsicTypedArrays(JSContext *ctx)
+@@ -55901,3 +55901,6 @@ void JS_AddIntrinsicTypedArrays(JSContext *ctx)
      JS_AddIntrinsicAtomics(ctx);
  #endif
  }
