@@ -63,6 +63,7 @@ quickjs_apply_patches(
 		"009-asan-compatibility.patch"
 		"010-win32-gmtime-nullcheck.patch"
 		"011-fix-compile-without-bignum.patch"
+		"012-workaround-emscripten-webkit.patch"
 )
 
 # Finally, rename VERSION to VERSION.txt
