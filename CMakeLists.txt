@@ -121,6 +121,21 @@ else()
 	# -Wimplicit-const-int-float-conversion		(Clang)
 	check_compiler_flags_output("-Werror -Wno-implicit-const-int-float-conversion -Wno-error=cpp" COMPILER_TYPE C   OUTPUT_FLAGS "-Wno-implicit-const-int-float-conversion" OUTPUT_VARIABLE _supported_quickjs_c_compiler_flags APPEND)
 
+	# -Wunused-variable
+	check_compiler_flags_output("-Werror -Wno-unused-variable -Wno-error=cpp" COMPILER_TYPE C   OUTPUT_FLAGS "-Wno-unused-variable" OUTPUT_VARIABLE _supported_quickjs_c_compiler_flags APPEND)
+
+	# -Wunused-but-set-variable
+	check_compiler_flags_output("-Werror -Wno-unused-but-set-variable -Wno-error=cpp" COMPILER_TYPE C   OUTPUT_FLAGS "-Wno-unused-but-set-variable" OUTPUT_VARIABLE _supported_quickjs_c_compiler_flags APPEND)
+
+	# -Wconditional-uninitialized
+	check_compiler_flags_output("-Werror -Wno-conditional-uninitialized -Wno-error=cpp" COMPILER_TYPE C   OUTPUT_FLAGS "-Wno-conditional-uninitialized" OUTPUT_VARIABLE _supported_quickjs_c_compiler_flags APPEND)
+
+	# -Wcomma
+	check_compiler_flags_output("-Werror -Wno-comma -Wno-error=cpp" COMPILER_TYPE C   OUTPUT_FLAGS "-Wno-comma" OUTPUT_VARIABLE _supported_quickjs_c_compiler_flags APPEND)
+
+	# -Wassign-enum
+	check_compiler_flags_output("-Werror -Wno-assign-enum -Wno-error=cpp" COMPILER_TYPE C   OUTPUT_FLAGS "-Wno-assign-enum" OUTPUT_VARIABLE _supported_quickjs_c_compiler_flags APPEND)
+
 	if (NOT _supported_quickjs_c_compiler_flags STREQUAL "")
 		string(REPLACE " " ";" _supported_quickjs_c_compiler_flags "${_supported_quickjs_c_compiler_flags}")
 		target_compile_options(quickjs PRIVATE ${_supported_quickjs_c_compiler_flags})
