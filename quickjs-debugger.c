@@ -4,7 +4,7 @@
  * QuickJS Debugging Extensions
  *
  * Copyright (c) 2020 Koushik Dutta
- * Copyright (c) 2020 Warzone 2100 Project
+ * Copyright (c) 2020-2025 Warzone 2100 Project
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -90,16 +90,19 @@ JSValue js_debugger_build_backtrace(JSContext *ctx, const uint8_t *cur_pc)
         p = JS_VALUE_GET_OBJ(sf->cur_func);
         if (p && js_class_has_bytecode(p->class_id)) {
             JSFunctionBytecode *b;
-            int line_num1;
-
             b = p->u.func.function_bytecode;
-            if (b->has_debug) {
+            if (b && sf->cur_pc) {
+				int line_num1, col_num1;
                 const uint8_t *pc = sf != ctx->rt->current_stack_frame || !cur_pc ? sf->cur_pc : cur_pc;
-                line_num1 = find_line_num(ctx, b, pc - b->byte_code_buf - 1);
-                JS_SetPropertyStr(ctx, current_frame, "filename", JS_AtomToString(ctx, b->debug.filename));
+                line_num1 = find_line_num(ctx, b, pc - b->byte_code_buf - 1, &col_num1);
+				if (b->filename) {
+					JS_SetPropertyStr(ctx, current_frame, "filename", JS_AtomToString(ctx, b->filename));
+				}
                 if (line_num1 != -1)
                     JS_SetPropertyStr(ctx, current_frame, "line", JS_NewUint32(ctx, line_num1));
-            }
+			} else if (b) {
+				JS_SetPropertyStr(ctx, current_frame, "name", JS_NewString(ctx, "(missing)"));
+			}
         } else {
             JS_SetPropertyStr(ctx, current_frame, "name", JS_NewString(ctx, "(native)"));
         }

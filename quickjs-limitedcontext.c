@@ -3,7 +3,7 @@
 /*
  * QuickJS Limited Context Extensions
  *
- * Copyright (c) 2020 Warzone 2100 Project
+ * Copyright (c) 2020-2025 Warzone 2100 Project
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -24,7 +24,7 @@
  * THE SOFTWARE.
  */
 
-#include "quickjs-limitedcontext.h"
+#include "../quickjs-limitedcontext.h"
 
 JSContext *JS_NewLimitedContext(JSRuntime *rt, const JSLimitedContextOptions* options)
 {
@@ -40,8 +40,6 @@ JSContext *JS_NewLimitedContext(JSRuntime *rt, const JSLimitedContextOptions* op
 		JS_AddIntrinsicDate(ctx);
 	if (options->eval)
 		JS_AddIntrinsicEval(ctx);	// required for JS_Eval (etc) to work
-	if (options->stringNormalize)
-		JS_AddIntrinsicStringNormalize(ctx);
 	if (options->regExp)
 		JS_AddIntrinsicRegExp(ctx);
 	if (options->json)
@@ -56,6 +54,8 @@ JSContext *JS_NewLimitedContext(JSRuntime *rt, const JSLimitedContextOptions* op
 		JS_AddIntrinsicPromise(ctx);
 	if (options->bigInt)
 		JS_AddIntrinsicBigInt(ctx);
+	if (options->weakRef)
+		JS_AddIntrinsicWeakRef(ctx);
 	return ctx;
 }
 
@@ -64,12 +64,13 @@ JSValue JS_Eval_BypassLimitedContext(JSContext *ctx, const char *input, size_t i
 				const char *filename, int eval_flags)
 {
 	int eval_type = eval_flags & JS_EVAL_TYPE_MASK;
+	int line = 1;
 	JSValue ret;
 
 	assert(eval_type == JS_EVAL_TYPE_GLOBAL ||
 		   eval_type == JS_EVAL_TYPE_MODULE);
 
-	ret = __JS_EvalInternal(ctx, ctx->global_obj, input, input_len, filename,
+	ret = __JS_EvalInternal(ctx, ctx->global_obj, input, input_len, filename, line,
 							  eval_flags, -1);
 	return ret;
 }
