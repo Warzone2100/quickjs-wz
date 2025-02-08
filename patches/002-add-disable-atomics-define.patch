@@ -1,12 +1,12 @@
-diff --git a/quickjs.c b/quickjs.c
---- a/quickjs.c
-+++ b/quickjs.c
-@@ -67,7 +67,7 @@
- 
- /* define to include Atomics.* operations which depend on the OS
-    threads */
--#if !defined(EMSCRIPTEN)
-+#if !defined(EMSCRIPTEN) && !defined(QUICKJS_DISABLE_ATOMICS)
+diff --git a/quickjs-ng/quickjs.c b/quickjs-ng/quickjs.c
+--- a/quickjs-ng/quickjs.c
++++ b/quickjs-ng/quickjs.c
+@@ -68,7 +68,7 @@
+ // atomic_store etc. are completely busted in recent versions of tcc;
+ // somehow the compiler forgets to load |ptr| into %rdi when calling
+ // the __atomic_*() helpers in its lib/stdatomic.c and lib/atomic.S
+-#if !defined(__TINYC__) && !defined(EMSCRIPTEN) && !defined(__wasi__) && !__STDC_NO_ATOMICS__
++#if !defined(__TINYC__) && !defined(EMSCRIPTEN) && !defined(__wasi__) && !defined(QJS_DISABLE_ATOMICS) && !__STDC_NO_ATOMICS__
+ #include "quickjs-c-atomics.h"
  #define CONFIG_ATOMICS
  #endif
- 

@@ -1,10 +1,10 @@
-diff --git a/quickjs.c b/quickjs.c
---- a/quickjs.c
-+++ b/quickjs.c
-@@ -55901,3 +55901,6 @@ void JS_AddIntrinsicTypedArrays(JSContext *ctx)
-     JS_AddIntrinsicAtomics(ctx);
- #endif
- }
+diff --git a/quickjs-ng/quickjs.c b/quickjs-ng/quickjs.c
+--- a/quickjs-ng/quickjs.c
++++ b/quickjs-ng/quickjs.c
+@@ -55896,3 +55896,6 @@ uintptr_t js_std_cmd(int cmd, ...) {
+ #undef malloc
+ #undef free
+ #undef realloc
 +
-+#include "quickjs-debugger.c"
-+#include "quickjs-limitedcontext.c"
++#include <quickjs-debugger.c>
++#include <quickjs-limitedcontext.c>
