@@ -24,7 +24,7 @@
  * THE SOFTWARE.
  */
 
-#include "../quickjs-limitedcontext.h"
+#include <quickjs-limitedcontext.h>
 
 JSContext *JS_NewLimitedContext(JSRuntime *rt, const JSLimitedContextOptions* options)
 {

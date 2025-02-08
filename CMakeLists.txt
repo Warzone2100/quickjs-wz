@@ -14,6 +14,10 @@ target_compile_definitions(qjs PRIVATE
 	QJS_DISABLE_ATOMICS
 )
 
+target_include_directories(qjs PUBLIC
+	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/quickjs-wz-extensions>
+)
+
 if(CMAKE_C_COMPILER_ID STREQUAL "GNU")
 	# GCC 9.3.0+ has been tested to be fine at -O2
 	if((CMAKE_C_COMPILER_VERSION VERSION_LESS 9.3) AND (CMAKE_C_COMPILER_VERSION VERSION_GREATER 7.0))
