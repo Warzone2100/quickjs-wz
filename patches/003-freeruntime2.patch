@@ -1,0 +1,40 @@
+diff --git a/quickjs-ng/quickjs.c b/quickjs-ng/quickjs.c
+--- a/quickjs-ng/quickjs.c
++++ b/quickjs-ng/quickjs.c
+@@ -2013,6 +2013,11 @@ void JS_SetRuntimeInfo(JSRuntime *rt, const char *s)
+ }
+ 
+ void JS_FreeRuntime(JSRuntime *rt)
++{
++    JS_FreeRuntime2(rt, NULL);
++}
++
++void JS_FreeRuntime2(JSRuntime *rt, void (*gc_leak_handler)(const char* msg))
+ {
+     struct list_head *el, *el1;
+     int i;
+@@ -2070,7 +2075,11 @@ void JS_FreeRuntime(JSRuntime *rt)
+     }
+ #endif
+ 
+-    assert(list_empty(&rt->gc_obj_list));
++    if (!list_empty(&rt->gc_obj_list)) {
++        if (gc_leak_handler != NULL) {
++            gc_leak_handler("gc_obj_list is not empty");
++        }
++    }
+ 
+     /* free the classes */
+     for(i = 0; i < rt->class_count; i++) {
+diff --git a/quickjs-ng/quickjs.h b/quickjs-ng/quickjs.h
+index bcdd87165..1a39017a2 100644
+--- a/quickjs-ng/quickjs.h
++++ b/quickjs-ng/quickjs.h
+@@ -377,6 +377,7 @@ JS_EXTERN void JS_SetMaxStackSize(JSRuntime *rt, size_t stack_size);
+ JS_EXTERN void JS_UpdateStackTop(JSRuntime *rt);
+ JS_EXTERN JSRuntime *JS_NewRuntime2(const JSMallocFunctions *mf, void *opaque);
+ JS_EXTERN void JS_FreeRuntime(JSRuntime *rt);
++JS_EXTERN void JS_FreeRuntime2(JSRuntime *rt, void (*gc_leak_handler)(const char* msg));
+ JS_EXTERN void *JS_GetRuntimeOpaque(JSRuntime *rt);
+ JS_EXTERN void JS_SetRuntimeOpaque(JSRuntime *rt, void *opaque);
+ JS_EXTERN int JS_AddRuntimeFinalizer(JSRuntime *rt,

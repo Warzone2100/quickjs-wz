@@ -54,21 +54,7 @@ quickjs_apply_patches(
 	PATCHES
 		"001-add-extensions.patch"
 		"002-add-disable-atomics-define.patch"
-		"003-fix-pedantic-cxx-warnings.patch"
-		"004-msvc-compatibility.patch"
-		"005-msvc-compatibility-64bit.patch"
-		"006-msvc-compatibility-pt3.patch"
-		"007-freeruntime2.patch"
-		"008-bsd-compile-fixes.patch"
-		"009-asan-compatibility.patch"
-		"010-win32-gmtime-nullcheck.patch"
-		"011-fix-compile-without-bignum.patch"
-		"012-workaround-emscripten-webkit.patch"
+		"003-freeruntime2.patch"
 )
-
-# Finally, rename VERSION to VERSION.txt
-if(EXISTS "${_directoryOfThisScript}/../VERSION")
-	file(RENAME "${_directoryOfThisScript}/../VERSION" "${_directoryOfThisScript}/../VERSION.txt")
-endif()
 
 message(STATUS "Finished applying patches.")
