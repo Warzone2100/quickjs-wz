@@ -55896,3 +55896,6 @@ uintptr_t js_std_cmd(int cmd, ...) {
 #undef malloc
 #undef free
 #undef realloc
+
+#include <quickjs-debugger.c>
+#include <quickjs-limitedcontext.c>
