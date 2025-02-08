@@ -24,7 +24,7 @@
 #ifndef QUICKJS_LIMITEDCONTEXT_EXTENSIONS_H
 #define QUICKJS_LIMITEDCONTEXT_EXTENSIONS_H
 
-#include "quickjs.h"
+#include <quickjs.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -35,7 +35,7 @@ typedef struct JSLimitedContextOptions
 	int baseObjects;
 	int dateObject;
 	int eval;
-	int stringNormalize;
+	int stringNormalize; // no longer has any effect
 	int regExp;
 	int json;
 	int proxy;
@@ -43,6 +43,7 @@ typedef struct JSLimitedContextOptions
 	int typedArrays;
 	int promise;
 	int bigInt;
+	int weakRef;
 } JSLimitedContextOptions;
 
 // Constructs a context with a configurable subset of language intrinsics
