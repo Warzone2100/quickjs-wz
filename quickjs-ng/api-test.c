@@ -3,11 +3,12 @@
 #endif
 #include <assert.h>
 #include <stdlib.h>
+#include <string.h>
 #include "quickjs.h"
 
 #define MAX_TIME 10
 
-static int timeout_interrupt_handler(JSRuntime *rt, void *opaque) 
+static int timeout_interrupt_handler(JSRuntime *rt, void *opaque)
 {
     int *time = (int *)opaque;
     if (*time <= MAX_TIME)
@@ -17,7 +18,7 @@ static int timeout_interrupt_handler(JSRuntime *rt, void *opaque)
 
 static void sync_call(void)
 {
-    const char *code = 
+    const char *code =
 "(function() { \
     try { \
         while (true) {} \
@@ -42,7 +43,7 @@ static void sync_call(void)
 
 static void async_call(void)
 {
-    const char *code = 
+    const char *code =
 "(async function() { \
     const loop = async () => { \
         await Promise.resolve(); \
@@ -73,7 +74,8 @@ static void async_call(void)
     JS_FreeRuntime(rt);
 }
 
-static JSValue save_value(JSContext *ctx, JSValue this_val, int argc, JSValue *argv)
+static JSValue save_value(JSContext *ctx, JSValueConst this_val,
+                          int argc, JSValueConst *argv)
 {
     assert(argc == 1);
     JSValue *p = (JSValue *)JS_GetContextOpaque(ctx);
@@ -96,8 +98,6 @@ static void async_call_stack_overflow(void)
 
     JSRuntime *rt = JS_NewRuntime();
     JSContext *ctx = JS_NewContext(rt);
-    JS_SetMaxStackSize(rt, 128 * 1024);
-    JS_UpdateStackTop(rt);
     JSValue value = JS_UNDEFINED;
     JS_SetContextOpaque(ctx, &value);
     JSValue global = JS_GetGlobalObject(ctx);
@@ -147,11 +147,99 @@ static void raw_context_global_var(void)
     JS_FreeRuntime(rt);
 }
 
+static void is_array(void)
+{
+    JSRuntime *rt = JS_NewRuntime();
+    JSContext *ctx = JS_NewContext(rt);
+    {
+        static const char code[] = "[]";
+        JSValue ret = JS_Eval(ctx, code, strlen(code), "*", JS_EVAL_TYPE_GLOBAL);
+        assert(!JS_IsException(ret));
+        assert(JS_IsArray(ret));
+        JS_FreeValue(ctx, ret);
+    }
+    {
+        static const char code[] = "new Proxy([], {})";
+        JSValue ret = JS_Eval(ctx, code, strlen(code), "*", JS_EVAL_TYPE_GLOBAL);
+        assert(!JS_IsException(ret));
+        assert(!JS_IsArray(ret));
+        assert(JS_IsProxy(ret));
+        JSValue handler = JS_GetProxyHandler(ctx, ret);
+        JSValue target = JS_GetProxyTarget(ctx, ret);
+        assert(!JS_IsException(handler));
+        assert(!JS_IsException(target));
+        assert(!JS_IsProxy(handler));
+        assert(!JS_IsProxy(target));
+        assert(JS_IsObject(handler));
+        assert(JS_IsArray(target));
+        JS_FreeValue(ctx, handler);
+        JS_FreeValue(ctx, target);
+        JS_FreeValue(ctx, ret);
+    }
+    JS_FreeContext(ctx);
+    JS_FreeRuntime(rt);
+}
+
+static int loader_calls;
+
+static JSModuleDef *loader(JSContext *ctx, const char *name, void *opaque)
+{
+    loader_calls++;
+    assert(!strcmp(name, "b"));
+    static const char code[] = "export function f(x){}";
+    JSValue ret = JS_Eval(ctx, code, strlen(code), "b",
+                          JS_EVAL_TYPE_MODULE|JS_EVAL_FLAG_COMPILE_ONLY);
+    assert(!JS_IsException(ret));
+    JSModuleDef *m = JS_VALUE_GET_PTR(ret);
+    assert(m);
+    JS_FreeValue(ctx, ret);
+    return m;
+}
+
+static void module_serde(void)
+{
+    JSRuntime *rt = JS_NewRuntime();
+    JS_SetDumpFlags(rt, JS_DUMP_MODULE_RESOLVE);
+    JS_SetModuleLoaderFunc(rt, NULL, loader, NULL);
+    JSContext *ctx = JS_NewContext(rt);
+    static const char code[] = "import {f} from 'b'; f()";
+    assert(loader_calls == 0);
+    JSValue mod = JS_Eval(ctx, code, strlen(code), "a",
+                          JS_EVAL_TYPE_MODULE|JS_EVAL_FLAG_COMPILE_ONLY);
+    assert(loader_calls == 1);
+    assert(!JS_IsException(mod));
+    assert(JS_IsModule(mod));
+    size_t len = 0;
+    uint8_t *buf = JS_WriteObject(ctx, &len, mod,
+                                  JS_WRITE_OBJ_BYTECODE|JS_WRITE_OBJ_REFERENCE);
+    assert(buf);
+    assert(len > 0);
+    JS_FreeValue(ctx, mod);
+    assert(loader_calls == 1);
+    mod = JS_ReadObject(ctx, buf, len, JS_READ_OBJ_BYTECODE);
+    free(buf);
+    assert(loader_calls == 1); // 'b' is returned from cache
+    assert(!JS_IsException(mod));
+    JSValue ret = JS_EvalFunction(ctx, mod);
+    assert(!JS_IsException(ret));
+    assert(JS_IsPromise(ret));
+    JSValue result = JS_PromiseResult(ctx, ret);
+    assert(!JS_IsException(result));
+    assert(JS_IsUndefined(result));
+    JS_FreeValue(ctx, result);
+    JS_FreeValue(ctx, ret);
+    JS_FreeValue(ctx, mod);
+    JS_FreeContext(ctx);
+    JS_FreeRuntime(rt);
+}
+
 int main(void)
 {
     sync_call();
     async_call();
     async_call_stack_overflow();
     raw_context_global_var();
+    is_array();
+    module_serde();
     return 0;
 }
