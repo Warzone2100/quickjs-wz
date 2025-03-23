@@ -28,9 +28,6 @@
 #include <inttypes.h>
 #include <string.h>
 #include <assert.h>
-#if !defined(_MSC_VER)
-#include <unistd.h>
-#endif
 #include <errno.h>
 #include <fcntl.h>
 #include <time.h>
@@ -120,7 +117,9 @@ static int eval_buf(JSContext *ctx, const void *buf, int buf_len,
         val = JS_Eval(ctx, buf, buf_len, filename,
                       eval_flags | JS_EVAL_FLAG_COMPILE_ONLY);
         if (!JS_IsException(val)) {
-            use_realpath = (*filename != '<'); // ex. "<cmdline>"
+            // ex. "<cmdline>" pr "/dev/stdin"
+            use_realpath =
+                !(*filename == '<' || !strncmp(filename, "/dev/", 5));
             if (js_module_set_import_meta(ctx, val, use_realpath, true) < 0) {
                 js_std_dump_error(ctx);
                 ret = -1;
@@ -197,14 +196,14 @@ static int64_t parse_limit(const char *arg) {
     return (int64_t)(d * unit);
 }
 
-static JSValue js_gc(JSContext *ctx, JSValue this_val,
-                     int argc, JSValue *argv)
+static JSValue js_gc(JSContext *ctx, JSValueConst this_val,
+                     int argc, JSValueConst *argv)
 {
     JS_RunGC(JS_GetRuntime(ctx));
     return JS_UNDEFINED;
 }
 
-static JSValue js_navigator_get_userAgent(JSContext *ctx, JSValue this_val)
+static JSValue js_navigator_get_userAgent(JSContext *ctx, JSValueConst this_val)
 {
     char version[32];
     snprintf(version, sizeof(version), "quickjs-ng/%s", JS_GetVersion());
@@ -380,8 +379,8 @@ void help(void)
            "-h  --help         list options\n"
            "-e  --eval EXPR    evaluate EXPR\n"
            "-i  --interactive  go to interactive mode\n"
-           "-m  --module       load as ES6 module (default=autodetect)\n"
-           "    --script       load as ES6 script (default=autodetect)\n"
+           "-C  --script       load as JS classic script (default=autodetect)\n"
+           "-m  --module       load as ES module (default=autodetect)\n"
            "-I  --include file include an additional file\n"
            "    --std          make 'std', 'os' and 'bjson' available to script\n"
            "-T  --trace        trace memory allocation\n"
@@ -439,16 +438,16 @@ int main(int argc, char **argv)
     while (optind < argc && *argv[optind] == '-') {
         char *arg = argv[optind] + 1;
         const char *longopt = "";
-        char *opt_arg = NULL;
+        char *optarg = NULL;
         /* a single - is not an option, it also stops argument scanning */
         if (!*arg)
             break;
         optind++;
         if (*arg == '-') {
             longopt = arg + 1;
-            opt_arg = strchr(longopt, '=');
-            if (opt_arg)
-                *opt_arg++ = '\0';
+            optarg = strchr(longopt, '=');
+            if (optarg)
+                *optarg++ = '\0';
             arg += strlen(arg);
             /* -- stops argument scanning */
             if (!*longopt)
@@ -458,22 +457,22 @@ int main(int argc, char **argv)
             char opt = *arg;
             if (opt) {
                 arg++;
-                if (!opt_arg && *arg)
-                    opt_arg = arg;
+                if (!optarg && *arg)
+                    optarg = arg;
             }
             if (opt == 'h' || opt == '?' || !strcmp(longopt, "help")) {
                 help();
                 continue;
             }
             if (opt == 'e' || !strcmp(longopt, "eval")) {
-                if (!opt_arg) {
+                if (!optarg) {
                     if (optind >= argc) {
                         fprintf(stderr, "qjs: missing expression for -e\n");
                         exit(1);
                     }
-                    opt_arg = argv[optind++];
+                    optarg = argv[optind++];
                 }
-                expr = opt_arg;
+                expr = optarg;
                 break;
             }
             if (opt == 'I' || !strcmp(longopt, "include")) {
@@ -496,7 +495,7 @@ int main(int argc, char **argv)
                 module = 1;
                 continue;
             }
-            if (!strcmp(longopt, "script")) {
+            if (opt == 'C' || !strcmp(longopt, "script")) {
                 module = 0;
                 continue;
             }
@@ -505,7 +504,7 @@ int main(int argc, char **argv)
                 continue;
             }
             if (opt == 'D' || !strcmp(longopt, "dump-flags")) {
-                dump_flags = opt_arg ? strtol(opt_arg, NULL, 16) : 0;
+                dump_flags = optarg ? strtol(optarg, NULL, 16) : 0;
                 break;
             }
             if (opt == 'T' || !strcmp(longopt, "trace")) {
@@ -521,58 +520,58 @@ int main(int argc, char **argv)
                 continue;
             }
             if (!strcmp(longopt, "memory-limit")) {
-                if (!opt_arg) {
+                if (!optarg) {
                     if (optind >= argc) {
                         fprintf(stderr, "expecting memory limit");
                         exit(1);
                     }
-                    opt_arg = argv[optind++];
+                    optarg = argv[optind++];
                 }
-                memory_limit = parse_limit(opt_arg);
+                memory_limit = parse_limit(optarg);
                 break;
             }
             if (!strcmp(longopt, "stack-size")) {
-                if (!opt_arg) {
+                if (!optarg) {
                     if (optind >= argc) {
                         fprintf(stderr, "expecting stack size");
                         exit(1);
                     }
-                    opt_arg = argv[optind++];
+                    optarg = argv[optind++];
                 }
-                stack_size = parse_limit(opt_arg);
+                stack_size = parse_limit(optarg);
                 break;
             }
             if (opt == 'c' || !strcmp(longopt, "compile")) {
-                if (!opt_arg) {
+                if (!optarg) {
                     if (optind >= argc) {
                         fprintf(stderr, "qjs: missing file for -c\n");
                         exit(1);
                     }
-                    opt_arg = argv[optind++];
+                    optarg = argv[optind++];
                 }
-                compile_file = opt_arg;
+                compile_file = optarg;
                 break;
             }
             if (opt == 'o' || !strcmp(longopt, "out")) {
-                if (!opt_arg) {
+                if (!optarg) {
                     if (optind >= argc) {
                         fprintf(stderr, "qjs: missing file for -o\n");
                         exit(1);
                     }
-                    opt_arg = argv[optind++];
+                    optarg = argv[optind++];
                 }
-                out = opt_arg;
+                out = optarg;
                 break;
             }
             if (!strcmp(longopt, "exe")) {
-                if (!opt_arg) {
+                if (!optarg) {
                     if (optind >= argc) {
                         fprintf(stderr, "qjs: missing file for --exe\n");
                         exit(1);
                     }
-                    opt_arg = argv[optind++];
+                    optarg = argv[optind++];
                 }
-                exe = opt_arg;
+                exe = optarg;
                 break;
             }
             if (opt) {
@@ -665,7 +664,7 @@ start:
             args[0] = JS_NewString(ctx, compile_file);
             args[1] = JS_NewString(ctx, out);
             args[2] = JS_NewString(ctx, exe != NULL ? exe : argv[0]);
-            ret = JS_Call(ctx, func, JS_UNDEFINED, countof(args), args);
+            ret = JS_Call(ctx, func, JS_UNDEFINED, 3, (JSValueConst *)args);
             JS_FreeValue(ctx, func);
             JS_FreeValue(ctx, args[0]);
             JS_FreeValue(ctx, args[1]);
