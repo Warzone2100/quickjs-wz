@@ -143,6 +143,10 @@ pathname of `path` and `err` the error code.
 Return `[str, err]` where `str` is the current working directory
 and `err` the error code.
 
+### `exePath()`
+
+Returns the full path of the current executable or `undefined` if not available / supported.
+
 ### `chdir(path)`
 
 Change the current directory. Return 0 if OK or `-errno`.
@@ -249,6 +253,8 @@ object containing optional parameters:
   process.
 - `uid` - Integer. If present, the process uid with `setuid`.
 - `gid` - Integer. If present, the process gid with `setgid`.
+- `groups` - Array of integer. If present, the supplementary
+   group IDs with `setgroup`.
 
 ### `waitpid(pid, options)`
 

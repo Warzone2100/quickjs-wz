@@ -1,9 +1,3 @@
-test262/test/built-ins/Array/fromAsync/builtin.js:24: Test262Error: Prototype of Array.fromAsync is Function.prototype Expected SameValue(«[object AsyncFunction]», «function () {
-    [native code]
-}») to be true
-test262/test/built-ins/Array/fromAsync/builtin.js:24: strict mode: Test262Error: Prototype of Array.fromAsync is Function.prototype Expected SameValue(«[object AsyncFunction]», «function () {
-    [native code]
-}») to be true
 test262/test/built-ins/AsyncFromSyncIteratorPrototype/next/iterator-result-poisoned-wrapper.js:64: TypeError: $DONE() not called
 test262/test/built-ins/AsyncFromSyncIteratorPrototype/next/iterator-result-poisoned-wrapper.js:64: strict mode: TypeError: $DONE() not called
 test262/test/built-ins/AsyncFromSyncIteratorPrototype/next/next-result-poisoned-wrapper.js:69: TypeError: $DONE() not called
@@ -16,26 +10,6 @@ test262/test/built-ins/AsyncFromSyncIteratorPrototype/throw/iterator-result-reje
 test262/test/built-ins/AsyncFromSyncIteratorPrototype/throw/iterator-result-rejected-promise-close.js:74: strict mode: TypeError: $DONE() not called
 test262/test/built-ins/AsyncFromSyncIteratorPrototype/throw/throw-result-poisoned-wrapper.js:81: TypeError: $DONE() not called
 test262/test/built-ins/AsyncFromSyncIteratorPrototype/throw/throw-result-poisoned-wrapper.js:81: strict mode: TypeError: $DONE() not called
-test262/test/built-ins/AsyncFromSyncIteratorPrototype/throw/throw-undefined-get-return-undefined.js:64: TypeError: $DONE() not called
-test262/test/built-ins/AsyncFromSyncIteratorPrototype/throw/throw-undefined-get-return-undefined.js:64: strict mode: TypeError: $DONE() not called
-test262/test/built-ins/AsyncFromSyncIteratorPrototype/throw/throw-undefined-poisoned-return.js:68: TypeError: $DONE() not called
-test262/test/built-ins/AsyncFromSyncIteratorPrototype/throw/throw-undefined-poisoned-return.js:68: strict mode: TypeError: $DONE() not called
-test262/test/built-ins/AsyncFromSyncIteratorPrototype/throw/throw-undefined-return-not-object.js:72: TypeError: $DONE() not called
-test262/test/built-ins/AsyncFromSyncIteratorPrototype/throw/throw-undefined-return-not-object.js:72: strict mode: TypeError: $DONE() not called
-test262/test/built-ins/AsyncFromSyncIteratorPrototype/throw/throw-undefined-return-object.js:66: TypeError: $DONE() not called
-test262/test/built-ins/AsyncFromSyncIteratorPrototype/throw/throw-undefined-return-object.js:66: strict mode: TypeError: $DONE() not called
-test262/test/built-ins/Iterator/prototype/constructor/prop-desc.js:10: Test262Error: Expected SameValue(«"undefined"», «"function"») to be true
-test262/test/built-ins/Iterator/prototype/constructor/prop-desc.js:10: strict mode: Test262Error: Expected SameValue(«"undefined"», «"function"») to be true
-test262/test/built-ins/Iterator/prototype/constructor/weird-setter.js:23: TypeError: cannot read property 'call' of undefined
-test262/test/built-ins/Iterator/prototype/constructor/weird-setter.js:23: strict mode: TypeError: cannot read property 'call' of undefined
-test262/test/built-ins/Object/defineProperties/typedarray-backed-by-resizable-buffer.js:20: Test262Error: Expected a TypeError to be thrown but no exception was thrown at all
-test262/test/built-ins/Object/defineProperties/typedarray-backed-by-resizable-buffer.js:20: strict mode: Test262Error: Expected a TypeError to be thrown but no exception was thrown at all
-test262/test/built-ins/Object/defineProperty/coerced-P-grow.js:45: TypeError: out-of-bound index in typed array
-test262/test/built-ins/Object/defineProperty/coerced-P-grow.js:45: strict mode: TypeError: out-of-bound index in typed array
-test262/test/built-ins/Object/defineProperty/coerced-P-shrink.js:16: Test262Error: Expected a TypeError to be thrown but no exception was thrown at all
-test262/test/built-ins/Object/defineProperty/coerced-P-shrink.js:16: strict mode: Test262Error: Expected a TypeError to be thrown but no exception was thrown at all
-test262/test/built-ins/Object/defineProperty/typedarray-backed-by-resizable-buffer.js:18: Test262Error: Expected a TypeError to be thrown but no exception was thrown at all
-test262/test/built-ins/Object/defineProperty/typedarray-backed-by-resizable-buffer.js:18: strict mode: Test262Error: Expected a TypeError to be thrown but no exception was thrown at all
 test262/test/built-ins/RegExp/prototype/exec/regexp-builtin-exec-v-u-flag.js:45: Test262Error: Actual argument shouldn't be nullish. Unicode property escapes with v flag
 test262/test/built-ins/RegExp/prototype/exec/regexp-builtin-exec-v-u-flag.js:45: strict mode: Test262Error: Actual argument shouldn't be nullish. Unicode property escapes with v flag
 test262/test/built-ins/RegExp/unicodeSets/generated/rgi-emoji-16.0.js:16: Test262Error: `\p{RGI_Emoji}` should match 🇨🇶 (U+01F1E8 U+01F1F6)
