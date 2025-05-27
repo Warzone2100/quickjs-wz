@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.10...3.24)
+cmake_minimum_required(VERSION 3.10...3.31)
 project (quickjs-wz C)
 
 if(${CMAKE_VERSION} VERSION_LESS 3.12)
@@ -25,7 +25,6 @@ set(CMAKE_C_STANDARD 11)
 
 set(QUICKJS_HEADERS
 	quickjs-ng/cutils.h
-	quickjs-ng/libbf.h
 	quickjs-ng/libregexp.h
 	quickjs-ng/libunicode.h
 	quickjs-ng/list.h
@@ -37,10 +36,10 @@ set(QUICKJS_HEADERS
 
 set(QUICKJS_SOURCES
 	quickjs-ng/cutils.c
-	quickjs-ng/libbf.c
 	quickjs-ng/libregexp.c
 	quickjs-ng/libunicode.c
 	quickjs-ng/quickjs.c
+	quickjs-ng/xsum.c
 	# extensions
 	# INCLUDED DIRECTLY IN QUICKJS.C: quickjs-wz-extensions/quickjs-debugger.c
 	# INCLUDED DIRECTLY IN QUICKJS.C: quickjs-wz-extensions/quickjs-limitedcontext.c
@@ -103,6 +102,8 @@ if(MSVC)
 	xcheck_add_c_compiler_flag(/wd4267) # -Wno-shorten-64-to-32
 	xcheck_add_c_compiler_flag(/wd4388) # -Wno-sign-compare
 	xcheck_add_c_compiler_flag(/wd4389) # -Wno-sign-compare
+	xcheck_add_c_compiler_flag(/wd4456) # Hides previous local declaration
+	xcheck_add_c_compiler_flag(/wd4457) # Hides function parameter
 	xcheck_add_c_compiler_flag(/wd4710) # Function not inlined
 	xcheck_add_c_compiler_flag(/wd4711) # Function was inlined
 	xcheck_add_c_compiler_flag(/wd4820) # Padding added after construct
