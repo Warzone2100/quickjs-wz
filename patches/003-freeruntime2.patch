@@ -1,7 +1,7 @@
 diff --git a/quickjs-ng/quickjs.c b/quickjs-ng/quickjs.c
 --- a/quickjs-ng/quickjs.c
 +++ b/quickjs-ng/quickjs.c
-@@ -2049,6 +2049,11 @@ void JS_SetRuntimeInfo(JSRuntime *rt, const char *s)
+@@ -2086,6 +2086,11 @@ void JS_SetRuntimeInfo(JSRuntime *rt, const char *s)
  }
  
  void JS_FreeRuntime(JSRuntime *rt)
@@ -13,7 +13,7 @@ diff --git a/quickjs-ng/quickjs.c b/quickjs-ng/quickjs.c
  {
      struct list_head *el, *el1;
      int i;
-@@ -2106,7 +2111,11 @@ void JS_FreeRuntime(JSRuntime *rt)
+@@ -2143,7 +2148,11 @@ void JS_FreeRuntime(JSRuntime *rt)
      }
  #endif
  
@@ -29,7 +29,7 @@ diff --git a/quickjs-ng/quickjs.c b/quickjs-ng/quickjs.c
 diff --git a/quickjs-ng/quickjs.h b/quickjs-ng/quickjs.h
 --- a/quickjs-ng/quickjs.h
 +++ b/quickjs-ng/quickjs.h
-@@ -423,6 +423,7 @@ JS_EXTERN void JS_SetMaxStackSize(JSRuntime *rt, size_t stack_size);
+@@ -449,6 +449,7 @@ JS_EXTERN void JS_SetMaxStackSize(JSRuntime *rt, size_t stack_size);
  JS_EXTERN void JS_UpdateStackTop(JSRuntime *rt);
  JS_EXTERN JSRuntime *JS_NewRuntime2(const JSMallocFunctions *mf, void *opaque);
  JS_EXTERN void JS_FreeRuntime(JSRuntime *rt);
