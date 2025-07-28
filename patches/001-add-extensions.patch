@@ -1,7 +1,7 @@
 diff --git a/quickjs-ng/quickjs.c b/quickjs-ng/quickjs.c
 --- a/quickjs-ng/quickjs.c
 +++ b/quickjs-ng/quickjs.c
-@@ -57851,3 +57851,6 @@ uintptr_t js_std_cmd(int cmd, ...) {
+@@ -57853,3 +57853,6 @@ uintptr_t js_std_cmd(int cmd, ...) {
  #undef malloc
  #undef free
  #undef realloc
