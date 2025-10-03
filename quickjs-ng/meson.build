@@ -138,10 +138,10 @@ qjs_sys_deps += dependency('dl', required: false)
 
 qjs_srcs = files(
   'cutils.c',
+  'dtoa.c',
   'libregexp.c',
   'libunicode.c',
   'quickjs.c',
-  'xsum.c'
 )
 qjs_hdrs = files(
   'quickjs.h',
