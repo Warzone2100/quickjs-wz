@@ -25,6 +25,7 @@ set(CMAKE_C_STANDARD 11)
 
 set(QUICKJS_HEADERS
 	quickjs-ng/cutils.h
+	quickjs-ng/dtoa.h
 	quickjs-ng/libregexp.h
 	quickjs-ng/libunicode.h
 	quickjs-ng/list.h
@@ -36,10 +37,10 @@ set(QUICKJS_HEADERS
 
 set(QUICKJS_SOURCES
 	quickjs-ng/cutils.c
+	quickjs-ng/dtoa.c
 	quickjs-ng/libregexp.c
 	quickjs-ng/libunicode.c
 	quickjs-ng/quickjs.c
-	quickjs-ng/xsum.c
 	# extensions
 	# INCLUDED DIRECTLY IN QUICKJS.C: quickjs-wz-extensions/quickjs-debugger.c
 	# INCLUDED DIRECTLY IN QUICKJS.C: quickjs-wz-extensions/quickjs-limitedcontext.c
