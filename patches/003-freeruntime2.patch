@@ -1,7 +1,7 @@
 diff --git a/quickjs-ng/quickjs.c b/quickjs-ng/quickjs.c
 --- a/quickjs-ng/quickjs.c
 +++ b/quickjs-ng/quickjs.c
-@@ -2086,6 +2086,11 @@ void JS_SetRuntimeInfo(JSRuntime *rt, const char *s)
+@@ -2136,6 +2136,11 @@ void JS_SetRuntimeInfo(JSRuntime *rt, const char *s)
  }
  
  void JS_FreeRuntime(JSRuntime *rt)
@@ -13,7 +13,7 @@ diff --git a/quickjs-ng/quickjs.c b/quickjs-ng/quickjs.c
  {
      struct list_head *el, *el1;
      int i;
-@@ -2143,7 +2148,11 @@ void JS_FreeRuntime(JSRuntime *rt)
+@@ -2193,7 +2198,11 @@ void JS_FreeRuntime(JSRuntime *rt)
      }
  #endif
  
