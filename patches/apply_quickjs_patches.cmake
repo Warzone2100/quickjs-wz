@@ -54,7 +54,18 @@ quickjs_apply_patches(
 	PATCHES
 		"001-add-extensions.patch"
 		"002-add-disable-atomics-define.patch"
-		"003-freeruntime2.patch"
+		"003-fix-pedantic-cxx-warnings.patch"
+		"004-local-math-wrappers.patch"
+		"005-msvc-compatibility.patch"
+		"006-msvc-compatibility-2.patch"
+		"007-fix-dtoa-includes.patch"
+		"008-freeruntime2.patch"
+		"009-bsd-compile-fixes.patch"
 )
+
+# Finally, rename VERSION to VERSION.txt
+if(EXISTS "${_directoryOfThisScript}/../VERSION")
+	file(RENAME "${_directoryOfThisScript}/../VERSION" "${_directoryOfThisScript}/../VERSION.txt")
+endif()
 
 message(STATUS "Finished applying patches.")

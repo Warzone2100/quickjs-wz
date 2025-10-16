@@ -1,0 +1,452 @@
+diff --git a/quickjs/cutils.c b/quickjs/cutils.c
+--- a/quickjs/cutils.c
++++ b/quickjs/cutils.c
+@@ -29,6 +29,10 @@
+ 
+ #include "cutils.h"
+ 
++#if defined(_MSC_VER)
++#include "win32-gettimeofday.c"
++#endif
++
+ void pstrcpy(char *buf, int buf_size, const char *str)
+ {
+     int c;
+diff --git a/quickjs/cutils.h b/quickjs/cutils.h
+--- a/quickjs/cutils.h
++++ b/quickjs/cutils.h
+@@ -29,17 +29,45 @@
+ #include <string.h>
+ #include <inttypes.h>
+ 
++#if defined(_MSC_VER)
++  #if !defined(NOMINMAX)
++    #define NOMINMAX // For windows.h
++  #endif
++  #include <windows.h>
++  #include <intrin.h>
++  #include <winsock2.h> // For timeval struct, etc
++#endif
++
++#if defined(_MSC_VER) && !defined(__clang__)
++#  define likely(x)       (x)
++#  define unlikely(x)     (x)
++#  define force_inline __forceinline
++#  define no_inline __declspec(noinline)
++#  define __maybe_unused
++#  define __attribute__(x)
++#  define __attribute(x)
++#else
+ #define likely(x)       __builtin_expect(!!(x), 1)
+ #define unlikely(x)     __builtin_expect(!!(x), 0)
+ #define force_inline inline __attribute__((always_inline))
+ #define no_inline __attribute__((noinline))
+ #define __maybe_unused __attribute__((unused))
++#endif
+ 
+ #define xglue(x, y) x ## y
+ #define glue(x, y) xglue(x, y)
+ #define stringify(s)    tostring(s)
+ #define tostring(s)     #s
+ 
++#if defined(_MSC_VER) && !defined(__clang__)
++#include <math.h>
++#define INF INFINITY
++#define NEG_INF -INFINITY
++#else
++#define INF (1.0/0.0)
++#define NEG_INF (-1.0/0.0)
++#endif
++
+ #ifndef offsetof
+ #define offsetof(type, field) ((size_t) &((type *)0)->field)
+ #endif
+@@ -66,6 +94,10 @@ enum {
+ };
+ #endif
+ 
++#if defined(_MSC_VER)
++int gettimeofday(struct timeval * tp, struct timezone * tzp);
++#endif
++
+ void pstrcpy(char *buf, int buf_size, const char *str);
+ char *pstrcat(char *buf, int buf_size, const char *s);
+ int strstart(const char *str, const char *val, const char **ptr);
+@@ -128,82 +160,113 @@ static inline int64_t min_int64(int64_t a, int64_t b)
+ /* WARNING: undefined if a = 0 */
+ static inline int clz32(unsigned int a)
+ {
++#if defined(_MSC_VER) && !defined(__clang__)
++    unsigned long index;
++    _BitScanReverse(&index, a);
++    return 31 - index;
++#else
+     return __builtin_clz(a);
++#endif
+ }
+ 
+ /* WARNING: undefined if a = 0 */
+ static inline int clz64(uint64_t a)
+ {
++#if defined(_MSC_VER) && !defined(__clang__)
++#if INTPTR_MAX == INT64_MAX
++    unsigned long index;
++    _BitScanReverse64(&index, a);
++    return 63 - index;
++#else
++    if (a >> 32)
++        return clz32((unsigned)(a >> 32));
++    else
++        return clz32((unsigned)a) + 32;
++#endif
++#else
+     return __builtin_clzll(a);
++#endif
+ }
+ 
+ /* WARNING: undefined if a = 0 */
+ static inline int ctz32(unsigned int a)
+ {
++#if defined(_MSC_VER) && !defined(__clang__)
++    unsigned long index;
++    _BitScanForward(&index, a);
++    return index;
++#else
+     return __builtin_ctz(a);
++#endif
+ }
+ 
+ /* WARNING: undefined if a = 0 */
+ static inline int ctz64(uint64_t a)
+ {
++#if defined(_MSC_VER) && !defined(__clang__)
++    unsigned long index;
++    _BitScanForward64(&index, a);
++    return index;
++#else
+     return __builtin_ctzll(a);
++#endif
+ }
+ 
+-struct __attribute__((packed)) packed_u64 {
+-    uint64_t v;
+-};
+-
+-struct __attribute__((packed)) packed_u32 {
+-    uint32_t v;
+-};
+-
+-struct __attribute__((packed)) packed_u16 {
+-    uint16_t v;
+-};
+-
+ static inline uint64_t get_u64(const uint8_t *tab)
+ {
+-    return ((const struct packed_u64 *)tab)->v;
++    uint64_t v;
++    memcpy(&v, tab, sizeof(v));
++    return v;
+ }
+ 
+ static inline int64_t get_i64(const uint8_t *tab)
+ {
+-    return (int64_t)((const struct packed_u64 *)tab)->v;
++    int64_t v;
++    memcpy(&v, tab, sizeof(v));
++    return v;
+ }
+ 
+ static inline void put_u64(uint8_t *tab, uint64_t val)
+ {
+-    ((struct packed_u64 *)tab)->v = val;
++    memcpy(tab, &val, sizeof(val));
+ }
+ 
+ static inline uint32_t get_u32(const uint8_t *tab)
+ {
+-    return ((const struct packed_u32 *)tab)->v;
++    uint32_t v;
++    memcpy(&v, tab, sizeof(v));
++    return v;
+ }
+ 
+ static inline int32_t get_i32(const uint8_t *tab)
+ {
+-    return (int32_t)((const struct packed_u32 *)tab)->v;
++    int32_t v;
++    memcpy(&v, tab, sizeof(v));
++    return v;
+ }
+ 
+ static inline void put_u32(uint8_t *tab, uint32_t val)
+ {
+-    ((struct packed_u32 *)tab)->v = val;
++    memcpy(tab, &val, sizeof(val));
+ }
+ 
+ static inline uint32_t get_u16(const uint8_t *tab)
+ {
+-    return ((const struct packed_u16 *)tab)->v;
++    uint16_t v;
++    memcpy(&v, tab, sizeof(v));
++    return v;
+ }
+ 
+ static inline int32_t get_i16(const uint8_t *tab)
+ {
+-    return (int16_t)((const struct packed_u16 *)tab)->v;
++    int16_t v;
++    memcpy(&v, tab, sizeof(v));
++    return v;
+ }
+ 
+ static inline void put_u16(uint8_t *tab, uint16_t val)
+ {
+-    ((struct packed_u16 *)tab)->v = val;
++    memcpy(tab, &val, sizeof(val));
+ }
+ 
+ static inline uint32_t get_u8(const uint8_t *tab)
+diff --git a/quickjs/quickjs.c b/quickjs/quickjs.c
+--- a/quickjs/quickjs.c
++++ b/quickjs/quickjs.c
+@@ -28,7 +28,14 @@
+ #include <inttypes.h>
+ #include <string.h>
+ #include <assert.h>
++#if !defined(QUICKJS_HAVE_SYS_TIME_H)
++  #if defined(__linux__) || defined(__APPLE__)
++    #define QUICKJS_HAVE_SYS_TIME_H
++  #endif
++#endif
++#if defined(QUICKJS_HAVE_SYS_TIME_H)
+ #include <sys/time.h>
++#endif
+ #include <time.h>
+ #include <fenv.h>
+ #include <math.h>
+@@ -38,6 +45,8 @@
+ #include <malloc.h>
+ #elif defined(__FreeBSD__)
+ #include <malloc_np.h>
++#elif defined(_WIN32)
++#include <malloc.h>
+ #endif
+ 
+ #include "cutils.h"
+@@ -49,7 +58,7 @@
+ 
+ #define OPTIMIZE         1
+ #define SHORT_OPCODES    1
+-#if defined(EMSCRIPTEN)
++#if defined(EMSCRIPTEN) || defined(_MSC_VER)
+ #define DIRECT_DISPATCH  0
+ #else
+ #define DIRECT_DISPATCH  1
+@@ -1601,17 +1610,39 @@ static inline BOOL js_check_stack_overflow(JSRuntime *rt, size_t alloca_size)
+     return FALSE;
+ }
+ #else
++
++#if !defined(__has_builtin)
++  #define __has_builtin(x) 0
++#endif
++
++#if defined(__GNUC__) || defined(__clang__) || __has_builtin(__builtin_frame_address)
+ /* Note: OS and CPU dependent */
+ static inline uintptr_t js_get_stack_pointer(void)
+ {
+     return (uintptr_t)__builtin_frame_address(0);
+ }
++#elif defined(_MSC_VER) && !defined(__clang__)
++static inline uintptr_t js_get_stack_pointer(void)
++{
++    return (uintptr_t)_AddressOfReturnAddress();
++}
++#else
++static inline uintptr_t js_get_stack_pointer(void)
++{
++    return 0;
++}
++#define NO_VALID_STACK_POINTER
++#endif
+ 
+ static inline BOOL js_check_stack_overflow(JSRuntime *rt, size_t alloca_size)
+ {
++#if defined(NO_VALID_STACK_POINTER)
++    return FALSE;
++#else
+     uintptr_t sp;
+     sp = js_get_stack_pointer() - alloca_size;
+     return unlikely(sp < rt->stack_limit);
++#endif
+ }
+ #endif
+ 
+@@ -12300,7 +12331,7 @@ static JSValue js_atof(JSContext *ctx, const char *str, const char **pp,
+         if (!(flags & ATOD_INT_ONLY) &&
+             (atod_type == ATOD_TYPE_FLOAT64) &&
+             strstart(p, "Infinity", &p)) {
+-            double d = 1.0 / 0.0;
++            double d = INF;
+             if (is_neg)
+                 d = -d;
+             val = JS_NewFloat64(ctx, d);
+@@ -22365,7 +22396,7 @@ static int json_parse_number(JSParseState *s, const uint8_t **pp)
+     if (!is_digit(*p)) {
+         if (s->ext_json) {
+             if (strstart((const char *)p, "Infinity", (const char **)&p)) {
+-                d = 1.0 / 0.0;
++                d = INF;
+                 if (*p_start == '-')
+                     d = -d;
+                 goto done;
+@@ -45473,7 +45504,7 @@ static JSValue js_math_min_max(JSContext *ctx, JSValueConst this_val,
+     uint32_t tag;
+ 
+     if (unlikely(argc == 0)) {
+-        return __JS_NewFloat64(ctx, is_max ? -1.0 / 0.0 : 1.0 / 0.0);
++        return __JS_NewFloat64(ctx, is_max ? NEG_INF : INF);
+     }
+ 
+     tag = JS_VALUE_GET_TAG(argv[0]);
+@@ -53063,7 +53094,7 @@ static const JSCFunctionListEntry js_global_funcs[] = {
+     JS_CFUNC_MAGIC_DEF("encodeURIComponent", 1, js_global_encodeURI, 1 ),
+     JS_CFUNC_DEF("escape", 1, js_global_escape ),
+     JS_CFUNC_DEF("unescape", 1, js_global_unescape ),
+-    JS_PROP_DOUBLE_DEF("Infinity", 1.0 / 0.0, 0 ),
++    JS_PROP_DOUBLE_DEF("Infinity", INF, 0 ),
+     JS_PROP_DOUBLE_DEF("NaN", NAN, 0 ),
+     JS_PROP_UNDEFINED_DEF("undefined", 0 ),
+     JS_PROP_STRING_DEF("[Symbol.toStringTag]", "global", JS_PROP_CONFIGURABLE ),
+diff --git a/quickjs/win32-gettimeofday.c b/quickjs/win32-gettimeofday.c
+new file mode 100644
+--- /dev/null
++++ b/quickjs/win32-gettimeofday.c
+@@ -0,0 +1,126 @@
++/*
++ * gettimeofday.c
++ *	  Win32 gettimeofday() replacement
++ *
++ * src/port/gettimeofday.c
++ *
++ * Copyright (c) 2003 SRA, Inc.
++ * Copyright (c) 2003 SKC, Inc.
++ *
++ * Permission to use, copy, modify, and distribute this software and
++ * its documentation for any purpose, without fee, and without a
++ * written agreement is hereby granted, provided that the above
++ * copyright notice and this paragraph and the following two
++ * paragraphs appear in all copies.
++ *
++ * IN NO EVENT SHALL THE AUTHOR BE LIABLE TO ANY PARTY FOR DIRECT,
++ * INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES, INCLUDING
++ * LOST PROFITS, ARISING OUT OF THE USE OF THIS SOFTWARE AND ITS
++ * DOCUMENTATION, EVEN IF THE UNIVERSITY OF CALIFORNIA HAS BEEN ADVISED
++ * OF THE POSSIBILITY OF SUCH DAMAGE.
++ *
++ * THE AUTHOR SPECIFICALLY DISCLAIMS ANY WARRANTIES, INCLUDING, BUT NOT
++ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
++ * A PARTICULAR PURPOSE.  THE SOFTWARE PROVIDED HEREUNDER IS ON AN "AS
++ * IS" BASIS, AND THE AUTHOR HAS NO OBLIGATIONS TO PROVIDE MAINTENANCE,
++ * SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
++ */
++
++#if defined(_MSC_VER)
++
++#if !defined(NOMINMAX)
++  #define NOMINMAX // For windows.h
++#endif
++#include <windows.h>
++
++/* FILETIME of Jan 1 1970 00:00:00, the PostgreSQL epoch */
++static const unsigned __int64 epoch = 116444736000000000ULL;
++
++/*
++ * FILETIME represents the number of 100-nanosecond intervals since
++ * January 1, 1601 (UTC).
++ */
++#define FILETIME_UNITS_PER_SEC	10000000L
++#define FILETIME_UNITS_PER_USEC 10
++
++/*
++ * Both GetSystemTimeAsFileTime and GetSystemTimePreciseAsFileTime share a
++ * signature, so we can just store a pointer to whichever we find. This
++ * is the pointer's type.
++ */
++typedef                VOID(WINAPI * PgGetSystemTimeFn) (LPFILETIME);
++
++/* One-time initializer function, must match that signature. */
++static void WINAPI init_gettimeofday(LPFILETIME lpSystemTimeAsFileTime);
++
++/* Storage for the function we pick at runtime */
++static PgGetSystemTimeFn pg_get_system_time = &init_gettimeofday;
++
++/*
++ * One time initializer.  Determine whether GetSystemTimePreciseAsFileTime
++ * is available and if so, plan to use it; if not, fall back to
++ * GetSystemTimeAsFileTime.
++ */
++static void WINAPI
++init_gettimeofday(LPFILETIME lpSystemTimeAsFileTime)
++{
++	/*
++	 * Because it's guaranteed that kernel32.dll will be linked into our
++	 * address space already, we don't need to LoadLibrary it and worry about
++	 * closing it afterwards, so we're not using Pg's dlopen/dlsym() wrapper.
++	 *
++	 * We'll just look up the address of GetSystemTimePreciseAsFileTime if
++	 * present.
++	 *
++	 * While we could look up the Windows version and skip this on Windows
++	 * versions below Windows 8 / Windows Server 2012 there isn't much point,
++	 * and determining the windows version is its self somewhat Windows
++	 * version and development SDK specific...
++	 */
++	pg_get_system_time = (PgGetSystemTimeFn) GetProcAddress(
++									   GetModuleHandle(TEXT("kernel32.dll")),
++										   "GetSystemTimePreciseAsFileTime");
++	if (pg_get_system_time == NULL)
++	{
++		/*
++		 * The expected error from GetLastError() is ERROR_PROC_NOT_FOUND, if
++		 * the function isn't present. No other error should occur.
++		 *
++		 * We can't report an error here because this might be running in
++		 * frontend code; and even if we're in the backend, it's too early to
++		 * elog(...) if we get some unexpected error.  Also, it's not a
++		 * serious problem, so just silently fall back to
++		 * GetSystemTimeAsFileTime irrespective of why the failure occurred.
++		 */
++		pg_get_system_time = &GetSystemTimeAsFileTime;
++	}
++
++	(*pg_get_system_time) (lpSystemTimeAsFileTime);
++}
++
++/*
++ * timezone information is stored outside the kernel so tzp isn't used anymore.
++ *
++ * Note: this function is not for Win32 high precision timing purposes. See
++ * elapsed_time().
++ */
++int
++gettimeofday(struct timeval * tp, struct timezone * tzp)
++{
++	FILETIME	file_time;
++	ULARGE_INTEGER ularge;
++
++	if (tp) {
++		(*pg_get_system_time) (&file_time);
++		ularge.LowPart = file_time.dwLowDateTime;
++		ularge.HighPart = file_time.dwHighDateTime;
++
++		tp->tv_sec = (long) ((ularge.QuadPart - epoch) / FILETIME_UNITS_PER_SEC);
++		tp->tv_usec = (long) (((ularge.QuadPart - epoch) % FILETIME_UNITS_PER_SEC)
++							  / FILETIME_UNITS_PER_USEC);
++	}
++
++	return 0;
++}
++
++#endif // defined(_MSC_VER)
