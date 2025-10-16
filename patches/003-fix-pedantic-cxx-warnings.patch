@@ -1,7 +1,15 @@
 diff --git a/quickjs/quickjs.h b/quickjs/quickjs.h
 --- a/quickjs/quickjs.h
 +++ b/quickjs/quickjs.h
-@@ -248,6 +248,38 @@ typedef struct JSValue {
+@@ -28,6 +28,7 @@
+ #include <stdio.h>
+ #include <stdint.h>
+ #include <string.h>
++#include <math.h>
+ 
+ #ifdef __cplusplus
+ extern "C" {
+@@ -248,6 +249,38 @@ typedef struct JSValue {
  
  #define JS_NAN (JSValue){ .u.float64 = JS_FLOAT64_NAN, JS_TAG_FLOAT64 }
  
@@ -27,7 +35,7 @@ diff --git a/quickjs/quickjs.h b/quickjs/quickjs.h
 +static inline JSValue JS_MKNAN(void)
 +{
 +    JSValue v;
-+    v.u.float64 = NAN;
++    v.u.float64 = JS_FLOAT64_NAN;
 +    v.tag = JS_TAG_FLOAT64;
 +    return v;
 +}
@@ -40,3 +48,13 @@ diff --git a/quickjs/quickjs.h b/quickjs/quickjs.h
  static inline JSValue __JS_NewFloat64(JSContext *ctx, double d)
  {
      JSValue v;
+@@ -1049,7 +1082,8 @@ static inline JSValue JS_NewCFunctionMagic(JSContext *ctx, JSCFunctionMagic *fun
+                                            int length, JSCFunctionEnum cproto, int magic)
+ {
+     /* Used to squelch a -Wcast-function-type warning. */
+-    JSCFunctionType ft = { .generic_magic = func };
++    JSCFunctionType ft;
++    ft.generic_magic = func;
+     return JS_NewCFunction2(ctx, ft.generic, name, length, cproto, magic);
+ }
+ int JS_SetConstructor(JSContext *ctx, JSValueConst func_obj,
