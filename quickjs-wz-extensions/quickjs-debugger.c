@@ -25,6 +25,12 @@
  * THE SOFTWARE.
  */
 
+#if defined(QUICKJS_NG)
+#  define WZ_QJS_GET_FUNC_NAME(ctx, obj) get_func_name(ctx, obj)
+#else
+#  define WZ_QJS_GET_FUNC_NAME(ctx, obj) get_prop_string(ctx, obj, JS_ATOM_name)
+#endif
+
 JSValue js_debugger_get_current_funcObject(JSContext *ctx)
 {
 	JSStackFrame *sf = ctx->rt->current_stack_frame;
@@ -57,7 +63,7 @@ JSValue js_debugger_get_caller_name(JSContext *ctx)
 		levels++;
 	}
 	JSValue result;
-	const char *func_name_str = get_func_name(ctx, sf->cur_func);
+	const char *func_name_str = WZ_QJS_GET_FUNC_NAME(ctx, sf->cur_func);
 	if (!func_name_str || func_name_str[0] == '\0')
 		result = JS_NewString(ctx, "<anonymous>");
 	else
@@ -80,7 +86,7 @@ JSValue js_debugger_build_backtrace(JSContext *ctx, const uint8_t *cur_pc)
         uint32_t id = stack_index++;
         JS_SetPropertyStr(ctx, current_frame, "id", JS_NewUint32(ctx, id));
 
-        func_name_str = get_func_name(ctx, sf->cur_func);
+        func_name_str = WZ_QJS_GET_FUNC_NAME(ctx, sf->cur_func);
         if (!func_name_str || func_name_str[0] == '\0')
             JS_SetPropertyStr(ctx, current_frame, "name", JS_NewString(ctx, "<anonymous>"));
         else
@@ -91,13 +97,23 @@ JSValue js_debugger_build_backtrace(JSContext *ctx, const uint8_t *cur_pc)
         if (p && js_class_has_bytecode(p->class_id)) {
             JSFunctionBytecode *b;
             b = p->u.func.function_bytecode;
+#if defined(QUICKJS_NG)
             if (b && sf->cur_pc) {
+#else
+            if (b && b->has_debug) {
+#endif
 				int line_num1, col_num1;
                 const uint8_t *pc = sf != ctx->rt->current_stack_frame || !cur_pc ? sf->cur_pc : cur_pc;
                 line_num1 = find_line_num(ctx, b, pc - b->byte_code_buf - 1, &col_num1);
+#if defined(QUICKJS_NG)
 				if (b->filename) {
 					JS_SetPropertyStr(ctx, current_frame, "filename", JS_AtomToString(ctx, b->filename));
 				}
+#else
+				if (b->debug.filename != JS_ATOM_NULL) {
+					JS_SetPropertyStr(ctx, current_frame, "filename", JS_AtomToString(ctx, b->debug.filename));
+				}
+#endif
                 if (line_num1 != -1)
                     JS_SetPropertyStr(ctx, current_frame, "line", JS_NewUint32(ctx, line_num1));
 			} else if (b) {
