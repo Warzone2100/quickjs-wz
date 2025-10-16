@@ -16,31 +16,28 @@ set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
 
 message(STATUS "QuickJS Library: Begin")
 
-# For now, avoid including the quickjs-ng CMake configuration directly, and explicitly specify our own
-# add_subdirectory(quickjs-ng)
-
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS ON)
 set(CMAKE_C_STANDARD 11)
 
 set(QUICKJS_HEADERS
-	quickjs-ng/cutils.h
-	quickjs-ng/dtoa.h
-	quickjs-ng/libregexp.h
-	quickjs-ng/libunicode.h
-	quickjs-ng/list.h
-	quickjs-ng/quickjs.h
+	quickjs/cutils.h
+	quickjs/dtoa.h
+	quickjs/libregexp.h
+	quickjs/libunicode.h
+	quickjs/list.h
+	quickjs/quickjs.h
 	# extensions
 	quickjs-wz-extensions/quickjs-debugger.h
 	quickjs-wz-extensions/quickjs-limitedcontext.h
 )
 
 set(QUICKJS_SOURCES
-	quickjs-ng/cutils.c
-	quickjs-ng/dtoa.c
-	quickjs-ng/libregexp.c
-	quickjs-ng/libunicode.c
-	quickjs-ng/quickjs.c
+	quickjs/cutils.c
+	quickjs/dtoa.c
+	quickjs/libregexp.c
+	quickjs/libunicode.c
+	quickjs/quickjs.c
 	# extensions
 	# INCLUDED DIRECTLY IN QUICKJS.C: quickjs-wz-extensions/quickjs-debugger.c
 	# INCLUDED DIRECTLY IN QUICKJS.C: quickjs-wz-extensions/quickjs-limitedcontext.c
@@ -52,10 +49,20 @@ if(WIN32)
 	list(APPEND qjs_defines WIN32_LEAN_AND_MEAN _WIN32_WINNT=0x0601)
 endif()
 
+file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/quickjs/VERSION.txt" QUICKJS_VERSION_STR)
+list(APPEND qjs_defines CONFIG_VERSION="${QUICKJS_VERSION_STR}")
+
+include(CheckIncludeFiles)
+CHECK_INCLUDE_FILES("sys/time.h" HAVE_SYS_TIME_H LANGUAGE C)
+include(CheckSymbolExists)
+check_symbol_exists(bswap16 "stdlib.h" HAVE_BSWAP16)
+check_symbol_exists(bswap32 "stdlib.h" HAVE_BSWAP32)
+check_symbol_exists(bswap64 "stdlib.h" HAVE_BSWAP64)
+
 add_library(qjs STATIC ${QUICKJS_HEADERS} ${QUICKJS_SOURCES})
 target_compile_definitions(qjs PRIVATE ${qjs_defines})
 target_include_directories(qjs PUBLIC
-	${CMAKE_CURRENT_SOURCE_DIR}/quickjs-ng
+	${CMAKE_CURRENT_SOURCE_DIR}/quickjs
 	${CMAKE_CURRENT_SOURCE_DIR}/quickjs-wz-extensions
 )
 
@@ -63,6 +70,10 @@ set(CMAKE_THREAD_PREFER_PTHREAD TRUE)
 set(THREADS_PREFER_PTHREAD_FLAG TRUE)
 find_package(Threads REQUIRED)
 target_link_libraries(qjs PRIVATE Threads::Threads)
+
+if(HAVE_SYS_TIME_H)
+	target_compile_definitions(qjs PRIVATE QUICKJS_HAVE_SYS_TIME_H)
+endif()
 
 if(CMAKE_C_COMPILER_ID STREQUAL "GNU")
 	# GCC 9.3.0+ has been tested to be fine at -O2
@@ -73,7 +84,7 @@ if(CMAKE_C_COMPILER_ID STREQUAL "GNU")
 	endif()
 endif()
 
-# Alias the quickjs-ng "qjs" library name to the previous library name that WZ used
+# Alias the "qjs" library name to the previous library name that WZ used
 add_library(quickjs ALIAS qjs)
 
 include(CheckCCompilerFlag)
@@ -111,7 +122,11 @@ if(MSVC)
 	xcheck_add_c_compiler_flag(/wd4996) # -Wdeprecated-declarations
 	xcheck_add_c_compiler_flag(/wd5045) # Compiler will insert Spectre mitigation for memory load if /Qspectre switch specified
 
+	xcheck_add_c_compiler_flag(/wd4115) # warning C4115: named type definition in parentheses
+	xcheck_add_c_compiler_flag(/wd4127) # warning C4127: conditional expression is constant
+	xcheck_add_c_compiler_flag(/wd4132) # warning C4132: const object should be initialized
 	xcheck_add_c_compiler_flag(/wd4146) # warning C4146: unary minus operator applied to unsigned type, result still unsigned
+	xcheck_add_c_compiler_flag(/wd4295) # warning C4295: 'digits': array is too small to include a terminating null character
 	xcheck_add_c_compiler_flag(/wd4456) # warning C4456: declaration of 'var' hides previous local declaration
 	xcheck_add_c_compiler_flag(/wd4457) # warning C4457: declaration of 'var' hides function parameter
 
