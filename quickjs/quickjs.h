@@ -28,6 +28,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
+#include <math.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -276,7 +277,7 @@ static inline JSValue JS_MKVAL(int64_t tag, int32_t int32)
 static inline JSValue JS_MKNAN(void)
 {
     JSValue v;
-    v.u.float64 = NAN;
+    v.u.float64 = JS_FLOAT64_NAN;
     v.tag = JS_TAG_FLOAT64;
     return v;
 }
@@ -1088,7 +1089,8 @@ static inline JSValue JS_NewCFunctionMagic(JSContext *ctx, JSCFunctionMagic *fun
                                            int length, JSCFunctionEnum cproto, int magic)
 {
     /* Used to squelch a -Wcast-function-type warning. */
-    JSCFunctionType ft = { .generic_magic = func };
+    JSCFunctionType ft;
+    ft.generic_magic = func;
     return JS_NewCFunction2(ctx, ft.generic, name, length, cproto, magic);
 }
 int JS_SetConstructor(JSContext *ctx, JSValueConst func_obj,
