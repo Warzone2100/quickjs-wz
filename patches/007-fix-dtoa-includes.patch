@@ -1,0 +1,13 @@
+diff --git a/quickjs/dtoa.c b/quickjs/dtoa.c
+--- a/quickjs/dtoa.c
++++ b/quickjs/dtoa.c
+@@ -28,9 +28,7 @@
+ #include <string.h>
+ #include <assert.h>
+ #include <ctype.h>
+-#include <sys/time.h>
+ #include <math.h>
+-#include <setjmp.h>
+ 
+ #include "cutils.h"
+ #include "dtoa.h"

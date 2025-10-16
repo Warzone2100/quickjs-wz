@@ -1,0 +1,45 @@
+diff --git a/quickjs/quickjs.c b/quickjs/quickjs.c
+--- a/quickjs/quickjs.c
++++ b/quickjs/quickjs.c
+@@ -1978,6 +1978,11 @@ void JS_SetRuntimeInfo(JSRuntime *rt, const char *s)
+ }
+ 
+ void JS_FreeRuntime(JSRuntime *rt)
++{
++    JS_FreeRuntime2(rt, NULL);
++}
++
++void JS_FreeRuntime2(JSRuntime *rt, void (*gc_leak_handler)(const char* msg))
+ {
+     struct list_head *el, *el1;
+     int i;
+@@ -2036,8 +2041,16 @@ void JS_FreeRuntime(JSRuntime *rt)
+             printf("Secondary object leaks: %d\n", count);
+     }
+ #endif
+-    assert(list_empty(&rt->gc_obj_list));
+-    assert(list_empty(&rt->weakref_list));
++    if (!list_empty(&rt->gc_obj_list)) {
++        if (gc_leak_handler != NULL) {
++            gc_leak_handler("gc_obj_list is not empty");
++        }
++    }
++    if (!list_empty(&rt->weakref_list)) {
++        if (gc_leak_handler != NULL) {
++            gc_leak_handler("weakref_list is not empty");
++        }
++    }
+ 
+     /* free the classes */
+     for(i = 0; i < rt->class_count; i++) {
+diff --git a/quickjs/quickjs.h b/quickjs/quickjs.h
+--- a/quickjs/quickjs.h
++++ b/quickjs/quickjs.h
+@@ -413,6 +413,7 @@ void JS_SetMaxStackSize(JSRuntime *rt, size_t stack_size);
+ void JS_UpdateStackTop(JSRuntime *rt);
+ JSRuntime *JS_NewRuntime2(const JSMallocFunctions *mf, void *opaque);
+ void JS_FreeRuntime(JSRuntime *rt);
++void JS_FreeRuntime2(JSRuntime *rt, void (*gc_leak_handler)(const char* msg));
+ void *JS_GetRuntimeOpaque(JSRuntime *rt);
+ void JS_SetRuntimeOpaque(JSRuntime *rt, void *opaque);
+ typedef void JS_MarkFunc(JSRuntime *rt, JSGCObjectHeader *gp);

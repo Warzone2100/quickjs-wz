@@ -1,10 +1,10 @@
-diff --git a/quickjs-ng/quickjs.c b/quickjs-ng/quickjs.c
---- a/quickjs-ng/quickjs.c
-+++ b/quickjs-ng/quickjs.c
-@@ -58122,3 +58122,6 @@ uintptr_t js_std_cmd(int cmd, ...) {
- #undef malloc
- #undef free
- #undef realloc
+diff --git a/quickjs/quickjs.c b/quickjs/quickjs.c
+--- a/quickjs/quickjs.c
++++ b/quickjs/quickjs.c
+@@ -58552,3 +58552,6 @@ int JS_AddIntrinsicWeakRef(JSContext *ctx)
+     JS_FreeValue(ctx, obj);
+     return 0;
+ }
 +
 +#include <quickjs-debugger.c>
 +#include <quickjs-limitedcontext.c>
