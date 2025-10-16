@@ -29,16 +29,44 @@
 #include <string.h>
 #include <inttypes.h>
 
+#if defined(_MSC_VER)
+  #if !defined(NOMINMAX)
+    #define NOMINMAX // For windows.h
+  #endif
+  #include <windows.h>
+  #include <intrin.h>
+  #include <winsock2.h> // For timeval struct, etc
+#endif
+
+#if defined(_MSC_VER) && !defined(__clang__)
+#  define likely(x)       (x)
+#  define unlikely(x)     (x)
+#  define force_inline __forceinline
+#  define no_inline __declspec(noinline)
+#  define __maybe_unused
+#  define __attribute__(x)
+#  define __attribute(x)
+#else
 #define likely(x)       __builtin_expect(!!(x), 1)
 #define unlikely(x)     __builtin_expect(!!(x), 0)
 #define force_inline inline __attribute__((always_inline))
 #define no_inline __attribute__((noinline))
 #define __maybe_unused __attribute__((unused))
+#endif
 
 #define xglue(x, y) x ## y
 #define glue(x, y) xglue(x, y)
 #define stringify(s)    tostring(s)
 #define tostring(s)     #s
+
+#if defined(_MSC_VER) && !defined(__clang__)
+#include <math.h>
+#define INF INFINITY
+#define NEG_INF -INFINITY
+#else
+#define INF (1.0/0.0)
+#define NEG_INF (-1.0/0.0)
+#endif
 
 #ifndef offsetof
 #define offsetof(type, field) ((size_t) &((type *)0)->field)
@@ -64,6 +92,10 @@ enum {
     FALSE = 0,
     TRUE = 1,
 };
+#endif
+
+#if defined(_MSC_VER)
+int gettimeofday(struct timeval * tp, struct timezone * tzp);
 #endif
 
 void pstrcpy(char *buf, int buf_size, const char *str);
@@ -128,82 +160,113 @@ static inline int64_t min_int64(int64_t a, int64_t b)
 /* WARNING: undefined if a = 0 */
 static inline int clz32(unsigned int a)
 {
+#if defined(_MSC_VER) && !defined(__clang__)
+    unsigned long index;
+    _BitScanReverse(&index, a);
+    return 31 - index;
+#else
     return __builtin_clz(a);
+#endif
 }
 
 /* WARNING: undefined if a = 0 */
 static inline int clz64(uint64_t a)
 {
+#if defined(_MSC_VER) && !defined(__clang__)
+#if INTPTR_MAX == INT64_MAX
+    unsigned long index;
+    _BitScanReverse64(&index, a);
+    return 63 - index;
+#else
+    if (a >> 32)
+        return clz32((unsigned)(a >> 32));
+    else
+        return clz32((unsigned)a) + 32;
+#endif
+#else
     return __builtin_clzll(a);
+#endif
 }
 
 /* WARNING: undefined if a = 0 */
 static inline int ctz32(unsigned int a)
 {
+#if defined(_MSC_VER) && !defined(__clang__)
+    unsigned long index;
+    _BitScanForward(&index, a);
+    return index;
+#else
     return __builtin_ctz(a);
+#endif
 }
 
 /* WARNING: undefined if a = 0 */
 static inline int ctz64(uint64_t a)
 {
+#if defined(_MSC_VER) && !defined(__clang__)
+    unsigned long index;
+    _BitScanForward64(&index, a);
+    return index;
+#else
     return __builtin_ctzll(a);
+#endif
 }
-
-struct __attribute__((packed)) packed_u64 {
-    uint64_t v;
-};
-
-struct __attribute__((packed)) packed_u32 {
-    uint32_t v;
-};
-
-struct __attribute__((packed)) packed_u16 {
-    uint16_t v;
-};
 
 static inline uint64_t get_u64(const uint8_t *tab)
 {
-    return ((const struct packed_u64 *)tab)->v;
+    uint64_t v;
+    memcpy(&v, tab, sizeof(v));
+    return v;
 }
 
 static inline int64_t get_i64(const uint8_t *tab)
 {
-    return (int64_t)((const struct packed_u64 *)tab)->v;
+    int64_t v;
+    memcpy(&v, tab, sizeof(v));
+    return v;
 }
 
 static inline void put_u64(uint8_t *tab, uint64_t val)
 {
-    ((struct packed_u64 *)tab)->v = val;
+    memcpy(tab, &val, sizeof(val));
 }
 
 static inline uint32_t get_u32(const uint8_t *tab)
 {
-    return ((const struct packed_u32 *)tab)->v;
+    uint32_t v;
+    memcpy(&v, tab, sizeof(v));
+    return v;
 }
 
 static inline int32_t get_i32(const uint8_t *tab)
 {
-    return (int32_t)((const struct packed_u32 *)tab)->v;
+    int32_t v;
+    memcpy(&v, tab, sizeof(v));
+    return v;
 }
 
 static inline void put_u32(uint8_t *tab, uint32_t val)
 {
-    ((struct packed_u32 *)tab)->v = val;
+    memcpy(tab, &val, sizeof(val));
 }
 
 static inline uint32_t get_u16(const uint8_t *tab)
 {
-    return ((const struct packed_u16 *)tab)->v;
+    uint16_t v;
+    memcpy(&v, tab, sizeof(v));
+    return v;
 }
 
 static inline int32_t get_i16(const uint8_t *tab)
 {
-    return (int16_t)((const struct packed_u16 *)tab)->v;
+    int16_t v;
+    memcpy(&v, tab, sizeof(v));
+    return v;
 }
 
 static inline void put_u16(uint8_t *tab, uint16_t val)
 {
-    ((struct packed_u16 *)tab)->v = val;
+    memcpy(tab, &val, sizeof(val));
 }
 
 static inline uint32_t get_u8(const uint8_t *tab)

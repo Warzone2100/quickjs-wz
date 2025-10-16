@@ -28,7 +28,14 @@
 #include <inttypes.h>
 #include <string.h>
 #include <assert.h>
+#if !defined(QUICKJS_HAVE_SYS_TIME_H)
+  #if defined(__linux__) || defined(__APPLE__)
+    #define QUICKJS_HAVE_SYS_TIME_H
+  #endif
+#endif
+#if defined(QUICKJS_HAVE_SYS_TIME_H)
 #include <sys/time.h>
+#endif
 #include <time.h>
 #include <fenv.h>
 #include <math.h>
@@ -38,6 +45,8 @@
 #include <malloc.h>
 #elif defined(__FreeBSD__)
 #include <malloc_np.h>
+#elif defined(_WIN32)
+#include <malloc.h>
 #endif
 
 #include "cutils.h"
@@ -49,7 +58,7 @@
 
 #define OPTIMIZE         1
 #define SHORT_OPCODES    1
-#if defined(EMSCRIPTEN)
+#if defined(EMSCRIPTEN) || defined(_MSC_VER)
 #define DIRECT_DISPATCH  0
 #else
 #define DIRECT_DISPATCH  1
@@ -1601,17 +1610,39 @@ static inline BOOL js_check_stack_overflow(JSRuntime *rt, size_t alloca_size)
     return FALSE;
 }
 #else
+
+#if !defined(__has_builtin)
+  #define __has_builtin(x) 0
+#endif
+
+#if defined(__GNUC__) || defined(__clang__) || __has_builtin(__builtin_frame_address)
 /* Note: OS and CPU dependent */
 static inline uintptr_t js_get_stack_pointer(void)
 {
     return (uintptr_t)__builtin_frame_address(0);
 }
+#elif defined(_MSC_VER) && !defined(__clang__)
+static inline uintptr_t js_get_stack_pointer(void)
+{
+    return (uintptr_t)_AddressOfReturnAddress();
+}
+#else
+static inline uintptr_t js_get_stack_pointer(void)
+{
+    return 0;
+}
+#define NO_VALID_STACK_POINTER
+#endif
 
 static inline BOOL js_check_stack_overflow(JSRuntime *rt, size_t alloca_size)
 {
+#if defined(NO_VALID_STACK_POINTER)
+    return FALSE;
+#else
     uintptr_t sp;
     sp = js_get_stack_pointer() - alloca_size;
     return unlikely(sp < rt->stack_limit);
+#endif
 }
 #endif
 
@@ -12300,7 +12331,7 @@ static JSValue js_atof(JSContext *ctx, const char *str, const char **pp,
         if (!(flags & ATOD_INT_ONLY) &&
             (atod_type == ATOD_TYPE_FLOAT64) &&
             strstart(p, "Infinity", &p)) {
-            double d = 1.0 / 0.0;
+            double d = INF;
             if (is_neg)
                 d = -d;
             val = JS_NewFloat64(ctx, d);
@@ -22365,7 +22396,7 @@ static int json_parse_number(JSParseState *s, const uint8_t **pp)
     if (!is_digit(*p)) {
         if (s->ext_json) {
             if (strstart((const char *)p, "Infinity", (const char **)&p)) {
-                d = 1.0 / 0.0;
+                d = INF;
                 if (*p_start == '-')
                     d = -d;
                 goto done;
@@ -45473,7 +45504,7 @@ static JSValue js_math_min_max(JSContext *ctx, JSValueConst this_val,
     uint32_t tag;
 
     if (unlikely(argc == 0)) {
-        return __JS_NewFloat64(ctx, is_max ? -1.0 / 0.0 : 1.0 / 0.0);
+        return __JS_NewFloat64(ctx, is_max ? NEG_INF : INF);
     }
 
     tag = JS_VALUE_GET_TAG(argv[0]);
@@ -53063,7 +53094,7 @@ static const JSCFunctionListEntry js_global_funcs[] = {
     JS_CFUNC_MAGIC_DEF("encodeURIComponent", 1, js_global_encodeURI, 1 ),
     JS_CFUNC_DEF("escape", 1, js_global_escape ),
     JS_CFUNC_DEF("unescape", 1, js_global_unescape ),
-    JS_PROP_DOUBLE_DEF("Infinity", 1.0 / 0.0, 0 ),
+    JS_PROP_DOUBLE_DEF("Infinity", INF, 0 ),
     JS_PROP_DOUBLE_DEF("NaN", NAN, 0 ),
     JS_PROP_UNDEFINED_DEF("undefined", 0 ),
     JS_PROP_STRING_DEF("[Symbol.toStringTag]", "global", JS_PROP_CONFIGURABLE ),
