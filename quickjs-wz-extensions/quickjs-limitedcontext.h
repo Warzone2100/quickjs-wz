@@ -35,14 +35,14 @@ typedef struct JSLimitedContextOptions
 	int baseObjects;
 	int dateObject;
 	int eval;
-	int stringNormalize; // no longer has any effect
+	int stringNormalize; // only has an effect on QuickJS (not QuickJS-NG)
 	int regExp;
 	int json;
 	int proxy;
 	int mapSet;
 	int typedArrays;
 	int promise;
-	int bigInt;
+	int bigInt; // only has an effect on QuickJS-NG (ignored on QuickJS)
 	int weakRef;
 } JSLimitedContextOptions;
 
