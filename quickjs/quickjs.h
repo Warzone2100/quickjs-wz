@@ -248,6 +248,38 @@ typedef struct JSValue {
 
 #define JS_NAN (JSValue){ .u.float64 = JS_FLOAT64_NAN, JS_TAG_FLOAT64 }
 
+/* msvc doesn't understand designated initializers without /std:c++20 */
+#ifdef __cplusplus
+#undef JS_MKVAL
+#undef JS_MKPTR
+#undef JS_NAN
+static inline JSValue JS_MKPTR(int64_t tag, void *ptr)
+{
+    JSValue v;
+    v.u.ptr = ptr;
+    v.tag = tag;
+    return v;
+}
+static inline JSValue JS_MKVAL(int64_t tag, int32_t int32)
+{
+    JSValue v;
+    v.u.int32 = int32;
+    v.tag = tag;
+    return v;
+}
+static inline JSValue JS_MKNAN(void)
+{
+    JSValue v;
+    v.u.float64 = NAN;
+    v.tag = JS_TAG_FLOAT64;
+    return v;
+}
+/* provide as macros for consistency and backward compat reasons */
+#define JS_MKPTR(tag, ptr) JS_MKPTR(tag, ptr)
+#define JS_MKVAL(tag, val) JS_MKVAL(tag, val)
+#define JS_NAN             JS_MKNAN() /* alas, not a constant expression */
+#endif
+
 static inline JSValue __JS_NewFloat64(JSContext *ctx, double d)
 {
     JSValue v;
