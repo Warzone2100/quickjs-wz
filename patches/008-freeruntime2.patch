@@ -1,7 +1,7 @@
 diff --git a/quickjs/quickjs.c b/quickjs/quickjs.c
 --- a/quickjs/quickjs.c
 +++ b/quickjs/quickjs.c
-@@ -1978,6 +1978,11 @@ void JS_SetRuntimeInfo(JSRuntime *rt, const char *s)
+@@ -2009,6 +2009,11 @@ void JS_SetRuntimeInfo(JSRuntime *rt, const char *s)
  }
  
  void JS_FreeRuntime(JSRuntime *rt)
@@ -13,7 +13,7 @@ diff --git a/quickjs/quickjs.c b/quickjs/quickjs.c
  {
      struct list_head *el, *el1;
      int i;
-@@ -2036,8 +2041,16 @@ void JS_FreeRuntime(JSRuntime *rt)
+@@ -2067,8 +2072,16 @@ void JS_FreeRuntime(JSRuntime *rt)
              printf("Secondary object leaks: %d\n", count);
      }
  #endif
@@ -35,7 +35,7 @@ diff --git a/quickjs/quickjs.c b/quickjs/quickjs.c
 diff --git a/quickjs/quickjs.h b/quickjs/quickjs.h
 --- a/quickjs/quickjs.h
 +++ b/quickjs/quickjs.h
-@@ -413,6 +413,7 @@ void JS_SetMaxStackSize(JSRuntime *rt, size_t stack_size);
+@@ -414,6 +414,7 @@ void JS_SetMaxStackSize(JSRuntime *rt, size_t stack_size);
  void JS_UpdateStackTop(JSRuntime *rt);
  JSRuntime *JS_NewRuntime2(const JSMallocFunctions *mf, void *opaque);
  void JS_FreeRuntime(JSRuntime *rt);
