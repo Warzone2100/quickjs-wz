@@ -29,10 +29,6 @@
 
 #include "cutils.h"
 
-#if defined(_MSC_VER)
-#include "win32-gettimeofday.c"
-#endif
-
 void pstrcpy(char *buf, int buf_size, const char *str)
 {
     int c;
