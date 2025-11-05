@@ -58921,3 +58921,6 @@ int JS_AddIntrinsicWeakRef(JSContext *ctx)
     JS_FreeValue(ctx, obj);
     return 0;
 }
+
+#include <quickjs-debugger.c>
+#include <quickjs-limitedcontext.c>
