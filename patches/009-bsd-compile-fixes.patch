@@ -10,7 +10,7 @@ diff --git a/quickjs/quickjs.c b/quickjs/quickjs.c
  #include <malloc.h>
  #elif defined(__FreeBSD__)
  #include <malloc_np.h>
-@@ -1724,9 +1724,9 @@ static size_t js_def_malloc_usable_size(const void *ptr)
+@@ -1755,9 +1755,9 @@ static size_t js_def_malloc_usable_size(const void *ptr)
      return malloc_size(ptr);
  #elif defined(_WIN32)
      return _msize((void *)ptr);
