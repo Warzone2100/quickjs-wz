@@ -110,6 +110,8 @@ typedef struct JSRefCountHeader {
    for objective C) */
 typedef struct __JSValue *JSValue;
 typedef const struct __JSValue *JSValueConst;
+#define JS_VALUE_CONST_CAST(cVal) (JSValue)cVal
+#define JS_VALUE_MAKE_CONST(val) (JSValueConst)val
 
 #define JS_VALUE_GET_TAG(v) (int)((uintptr_t)(v) & 0xf)
 /* same as JS_VALUE_GET_TAG, but return JS_TAG_FLOAT64 with NaN boxing */
@@ -147,6 +149,8 @@ static inline JSValue __JS_NewShortBigInt(JSContext *ctx, int32_t d)
 typedef uint64_t JSValue;
 
 #define JSValueConst JSValue
+#define JS_VALUE_CONST_CAST(cVal) cVal
+#define JS_VALUE_MAKE_CONST(val) val
 
 #define JS_VALUE_GET_TAG(v) (int)((v) >> 32)
 #define JS_VALUE_GET_INT(v) (int)(v)
@@ -232,6 +236,8 @@ typedef struct JSValue {
 } JSValue;
 
 #define JSValueConst JSValue
+#define JS_VALUE_CONST_CAST(cVal) cVal
+#define JS_VALUE_MAKE_CONST(val) val
 
 #define JS_VALUE_GET_TAG(v) ((int32_t)(v).tag)
 /* same as JS_VALUE_GET_TAG, but return JS_TAG_FLOAT64 with NaN boxing */
@@ -734,7 +740,7 @@ static inline JSValue JS_DupValue(JSContext *ctx, JSValueConst v)
         JSRefCountHeader *p = (JSRefCountHeader *)JS_VALUE_GET_PTR(v);
         p->ref_count++;
     }
-    return (JSValue)v;
+    return JS_VALUE_CONST_CAST(v);
 }
 
 static inline JSValue JS_DupValueRT(JSRuntime *rt, JSValueConst v)
@@ -743,7 +749,7 @@ static inline JSValue JS_DupValueRT(JSRuntime *rt, JSValueConst v)
         JSRefCountHeader *p = (JSRefCountHeader *)JS_VALUE_GET_PTR(v);
         p->ref_count++;
     }
-    return (JSValue)v;
+    return JS_VALUE_CONST_CAST(v);
 }
 
 JS_BOOL JS_StrictEq(JSContext *ctx, JSValueConst op1, JSValueConst op2);
