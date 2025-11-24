@@ -1,7 +1,7 @@
 diff --git a/quickjs/quickjs.c b/quickjs/quickjs.c
 --- a/quickjs/quickjs.c
 +++ b/quickjs/quickjs.c
-@@ -46261,39 +46261,69 @@ static JSValue js_math_random(JSContext *ctx, JSValueConst this_val,
+@@ -46681,39 +46681,69 @@ static JSValue js_math_random(JSContext *ctx, JSValueConst this_val,
      return __JS_NewFloat64(ctx, u.d - 1.0);
  }
  
