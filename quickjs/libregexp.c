@@ -32,6 +32,10 @@
 #include "libregexp.h"
 #include "libunicode.h"
 
+#if defined(_WIN32)
+#include <malloc.h>
+#endif
+
 /*
   TODO:
 
