@@ -61,6 +61,7 @@ quickjs_apply_patches(
 		"007-fix-dtoa-includes.patch"
 		"008-freeruntime2.patch"
 		"009-bsd-compile-fixes.patch"
+		"010-unsigned-enum-bitfield.patch"
 )
 
 # Finally, rename VERSION to VERSION.txt
