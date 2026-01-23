@@ -28,7 +28,6 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
-#include <math.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -110,8 +109,6 @@ typedef struct JSRefCountHeader {
    for objective C) */
 typedef struct __JSValue *JSValue;
 typedef const struct __JSValue *JSValueConst;
-#define JS_VALUE_CONST_CAST(cVal) (JSValue)cVal
-#define JS_VALUE_MAKE_CONST(val) (JSValueConst)val
 
 #define JS_VALUE_GET_TAG(v) (int)((uintptr_t)(v) & 0xf)
 /* same as JS_VALUE_GET_TAG, but return JS_TAG_FLOAT64 with NaN boxing */
@@ -149,8 +146,6 @@ static inline JSValue __JS_NewShortBigInt(JSContext *ctx, int32_t d)
 typedef uint64_t JSValue;
 
 #define JSValueConst JSValue
-#define JS_VALUE_CONST_CAST(cVal) cVal
-#define JS_VALUE_MAKE_CONST(val) val
 
 #define JS_VALUE_GET_TAG(v) (int)((v) >> 32)
 #define JS_VALUE_GET_INT(v) (int)(v)
@@ -236,8 +231,6 @@ typedef struct JSValue {
 } JSValue;
 
 #define JSValueConst JSValue
-#define JS_VALUE_CONST_CAST(cVal) cVal
-#define JS_VALUE_MAKE_CONST(val) val
 
 #define JS_VALUE_GET_TAG(v) ((int32_t)(v).tag)
 /* same as JS_VALUE_GET_TAG, but return JS_TAG_FLOAT64 with NaN boxing */
@@ -254,38 +247,6 @@ typedef struct JSValue {
 #define JS_TAG_IS_FLOAT64(tag) ((unsigned)(tag) == JS_TAG_FLOAT64)
 
 #define JS_NAN (JSValue){ .u.float64 = JS_FLOAT64_NAN, JS_TAG_FLOAT64 }
-
-/* msvc doesn't understand designated initializers without /std:c++20 */
-#ifdef __cplusplus
-#undef JS_MKVAL
-#undef JS_MKPTR
-#undef JS_NAN
-static inline JSValue JS_MKPTR(int64_t tag, void *ptr)
-{
-    JSValue v;
-    v.u.ptr = ptr;
-    v.tag = tag;
-    return v;
-}
-static inline JSValue JS_MKVAL(int64_t tag, int32_t int32)
-{
-    JSValue v;
-    v.u.int32 = int32;
-    v.tag = tag;
-    return v;
-}
-static inline JSValue JS_MKNAN(void)
-{
-    JSValue v;
-    v.u.float64 = JS_FLOAT64_NAN;
-    v.tag = JS_TAG_FLOAT64;
-    return v;
-}
-/* provide as macros for consistency and backward compat reasons */
-#define JS_MKPTR(tag, ptr) JS_MKPTR(tag, ptr)
-#define JS_MKVAL(tag, val) JS_MKVAL(tag, val)
-#define JS_NAN             JS_MKNAN() /* alas, not a constant expression */
-#endif
 
 static inline JSValue __JS_NewFloat64(JSContext *ctx, double d)
 {
@@ -414,7 +375,6 @@ void JS_SetMaxStackSize(JSRuntime *rt, size_t stack_size);
 void JS_UpdateStackTop(JSRuntime *rt);
 JSRuntime *JS_NewRuntime2(const JSMallocFunctions *mf, void *opaque);
 void JS_FreeRuntime(JSRuntime *rt);
-void JS_FreeRuntime2(JSRuntime *rt, void (*gc_leak_handler)(const char* msg));
 void *JS_GetRuntimeOpaque(JSRuntime *rt);
 void JS_SetRuntimeOpaque(JSRuntime *rt, void *opaque);
 typedef void JS_MarkFunc(JSRuntime *rt, JSGCObjectHeader *gp);
@@ -741,7 +701,7 @@ static inline JSValue JS_DupValue(JSContext *ctx, JSValueConst v)
         JSRefCountHeader *p = (JSRefCountHeader *)JS_VALUE_GET_PTR(v);
         p->ref_count++;
     }
-    return JS_VALUE_CONST_CAST(v);
+    return (JSValue)v;
 }
 
 static inline JSValue JS_DupValueRT(JSRuntime *rt, JSValueConst v)
@@ -750,7 +710,7 @@ static inline JSValue JS_DupValueRT(JSRuntime *rt, JSValueConst v)
         JSRefCountHeader *p = (JSRefCountHeader *)JS_VALUE_GET_PTR(v);
         p->ref_count++;
     }
-    return JS_VALUE_CONST_CAST(v);
+    return (JSValue)v;
 }
 
 JS_BOOL JS_StrictEq(JSContext *ctx, JSValueConst op1, JSValueConst op2);
@@ -1089,8 +1049,7 @@ static inline JSValue JS_NewCFunctionMagic(JSContext *ctx, JSCFunctionMagic *fun
                                            int length, JSCFunctionEnum cproto, int magic)
 {
     /* Used to squelch a -Wcast-function-type warning. */
-    JSCFunctionType ft;
-    ft.generic_magic = func;
+    JSCFunctionType ft = { .generic_magic = func };
     return JS_NewCFunction2(ctx, ft.generic, name, length, cproto, magic);
 }
 int JS_SetConstructor(JSContext *ctx, JSValueConst func_obj,
