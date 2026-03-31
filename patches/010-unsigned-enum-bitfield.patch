@@ -1,7 +1,7 @@
 diff --git a/quickjs/quickjs.c b/quickjs/quickjs.c
 --- a/quickjs/quickjs.c
 +++ b/quickjs/quickjs.c
-@@ -566,7 +566,7 @@ typedef enum {
+@@ -567,7 +567,7 @@ typedef enum {
  } JSClosureTypeEnum;
  
  typedef struct JSClosureVar {

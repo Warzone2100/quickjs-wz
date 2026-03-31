@@ -1,7 +1,7 @@
 diff --git a/quickjs/quickjs.c b/quickjs/quickjs.c
 --- a/quickjs/quickjs.c
 +++ b/quickjs/quickjs.c
-@@ -2006,6 +2006,11 @@ void JS_SetRuntimeInfo(JSRuntime *rt, const char *s)
+@@ -2017,6 +2017,11 @@ void JS_SetRuntimeInfo(JSRuntime *rt, const char *s)
  }
  
  void JS_FreeRuntime(JSRuntime *rt)
@@ -13,7 +13,7 @@ diff --git a/quickjs/quickjs.c b/quickjs/quickjs.c
  {
      struct list_head *el, *el1;
      int i;
-@@ -2064,8 +2069,16 @@ void JS_FreeRuntime(JSRuntime *rt)
+@@ -2075,8 +2080,16 @@ void JS_FreeRuntime(JSRuntime *rt)
              printf("Secondary object leaks: %d\n", count);
      }
  #endif
