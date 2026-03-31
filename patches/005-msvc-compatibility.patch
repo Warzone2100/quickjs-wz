@@ -207,20 +207,6 @@ diff --git a/quickjs/cutils.h b/quickjs/cutils.h
  }
  
  static inline uint32_t get_u8(const uint8_t *tab)
-diff --git a/quickjs/libregexp.c b/quickjs/libregexp.c
---- a/quickjs/libregexp.c
-+++ b/quickjs/libregexp.c
-@@ -32,6 +32,10 @@
- #include "libregexp.h"
- #include "libunicode.h"
- 
-+#if defined(_WIN32)
-+#include <malloc.h>
-+#endif
-+
- /*
-   TODO:
- 
 diff --git a/quickjs/quickjs.c b/quickjs/quickjs.c
 --- a/quickjs/quickjs.c
 +++ b/quickjs/quickjs.c
@@ -257,7 +243,7 @@ diff --git a/quickjs/quickjs.c b/quickjs/quickjs.c
  #define DIRECT_DISPATCH  0
  #else
  #define DIRECT_DISPATCH  1
-@@ -1628,17 +1637,39 @@ static inline BOOL js_check_stack_overflow(JSRuntime *rt, size_t alloca_size)
+@@ -1630,17 +1639,39 @@ static inline BOOL js_check_stack_overflow(JSRuntime *rt, size_t alloca_size)
      return FALSE;
  }
  #else
@@ -297,7 +283,7 @@ diff --git a/quickjs/quickjs.c b/quickjs/quickjs.c
  }
  #endif
  
-@@ -12405,7 +12436,7 @@ static JSValue js_atof(JSContext *ctx, const char *str, const char **pp,
+@@ -12421,7 +12452,7 @@ static JSValue js_atof(JSContext *ctx, const char *str, const char **pp,
          if (!(flags & ATOD_INT_ONLY) &&
              (atod_type == ATOD_TYPE_FLOAT64) &&
              strstart(p, "Infinity", &p)) {
@@ -306,7 +292,7 @@ diff --git a/quickjs/quickjs.c b/quickjs/quickjs.c
              if (is_neg)
                  d = -d;
              val = JS_NewFloat64(ctx, d);
-@@ -22804,7 +22835,7 @@ static int json_parse_number(JSParseState *s, const uint8_t **pp)
+@@ -22831,7 +22862,7 @@ static int json_parse_number(JSParseState *s, const uint8_t **pp)
      if (!is_digit(*p)) {
          if (s->ext_json) {
              if (strstart((const char *)p, "Infinity", (const char **)&p)) {
@@ -315,7 +301,7 @@ diff --git a/quickjs/quickjs.c b/quickjs/quickjs.c
                  if (*p_start == '-')
                      d = -d;
                  goto done;
-@@ -46254,7 +46285,7 @@ static JSValue js_math_min_max(JSContext *ctx, JSValueConst this_val,
+@@ -46266,7 +46297,7 @@ static JSValue js_math_min_max(JSContext *ctx, JSValueConst this_val,
      uint32_t tag;
  
      if (unlikely(argc == 0)) {
@@ -324,7 +310,7 @@ diff --git a/quickjs/quickjs.c b/quickjs/quickjs.c
      }
  
      tag = JS_VALUE_GET_TAG(argv[0]);
-@@ -53984,7 +54015,7 @@ static const JSCFunctionListEntry js_global_funcs[] = {
+@@ -54339,7 +54370,7 @@ static const JSCFunctionListEntry js_global_funcs[] = {
      JS_CFUNC_MAGIC_DEF("encodeURIComponent", 1, js_global_encodeURI, 1 ),
      JS_CFUNC_DEF("escape", 1, js_global_escape ),
      JS_CFUNC_DEF("unescape", 1, js_global_unescape ),
