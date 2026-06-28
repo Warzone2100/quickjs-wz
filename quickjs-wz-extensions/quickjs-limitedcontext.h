@@ -52,6 +52,10 @@ JSContext *JS_NewLimitedContext(JSRuntime *rt, const JSLimitedContextOptions* op
 // Always accessible JS_Eval (even if limited context has eval disabled)
 JSValue JS_Eval_BypassLimitedContext(JSContext *ctx, const char *input, size_t input_len, const char *filename, int eval_flags);
 
+// Resolve a top-level binding by name: the global lexical scope (let/const/class) first,
+// then the global object (var/function)
+JSValue JS_GetGlobalLexicalOrVar(JSContext *ctx, const char *name, size_t name_len);
+
 #ifdef __cplusplus
 } /* extern "C" { */
 #endif
