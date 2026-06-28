@@ -3,7 +3,7 @@
 /*
  * QuickJS Limited Context Extensions
  *
- * Copyright (c) 2020-2025 Warzone 2100 Project
+ * Copyright (c) 2020-2026 Warzone 2100 Project
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -85,5 +85,64 @@ JSValue JS_Eval_BypassLimitedContext(JSContext *ctx, const char *input, size_t i
 	ret = __JS_EvalInternal(ctx, ctx->global_obj, input, input_len, filename,
 							  eval_flags, -1);
 #endif
+	return ret;
+}
+
+// Resolve a top-level binding by name: the global lexical scope (let/const/class) first,
+// then the global object (var/function)
+//
+// Returns the bound value as a new JSValue reference the caller must free,
+// or JS_UNDEFINED if there is no such binding
+//
+// NOTES:
+// Top-level `class`/`let`/`const` are lexical bindings stored in ctx->global_var_obj (*not*
+// as global-object properties), which is why a plain JS_GetPropertyStr on the global object
+// cannot find them. This performs a pure property lookup.
+JSValue JS_GetGlobalLexicalOrVar(JSContext *ctx, const char *name, size_t name_len)
+{
+	JSPropertyDescriptor desc;
+	JSAtom atom;
+	JSValue ret = JS_UNDEFINED;
+	int found;
+
+	if (!ctx || !name) {
+		return JS_UNDEFINED;
+	}
+
+	// A limited context created without base objects has no global lexical scope object
+	if (!JS_IsObject(ctx->global_var_obj) || !JS_IsObject(ctx->global_obj)) {
+		return JS_UNDEFINED;
+	}
+
+	atom = JS_NewAtomLen(ctx, name, name_len);
+	if (atom == JS_ATOM_NULL) {
+		// OOM - clear the pending exception & report unresolved
+		JS_FreeValue(ctx, JS_GetException(ctx));
+		return JS_UNDEFINED;
+	}
+
+	// 1) Global lexical scope: let/const/class. Own property of global_var_obj.
+	//    Its value (a var-ref) is dereferenced into desc.value by JS_GetOwnProperty.
+	found = JS_GetOwnProperty(ctx, &desc, ctx->global_var_obj, atom);
+	if (found == 0) {
+		// 2) Global object: var/function declarations. Own-only, thus we should not pick up
+		//    inherited members like toString / valueOf from Object.prototype.
+		found = JS_GetOwnProperty(ctx, &desc, ctx->global_obj, atom);
+	}
+
+	if (found > 0) {
+		// desc.value already holds the dereferenced binding value
+		// For an accessor-typed binding, desc.value is JS_UNDEFINED, which is fine
+		// We do not invoke getters
+		JS_FreeValue(ctx, desc.getter);
+		JS_FreeValue(ctx, desc.setter);
+		ret = desc.value; // ownership transferred to the caller
+	} else if (found < 0) {
+		// A binding still in the temporal dead zone (uninitialized) throws here
+		// Clear the pending exception & report unresolved
+		JS_FreeValue(ctx, JS_GetException(ctx));
+	}
+
+	JS_FreeAtom(ctx, atom);
 	return ret;
 }
