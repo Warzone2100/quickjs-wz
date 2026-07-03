@@ -56,6 +56,13 @@ JSValue JS_Eval_BypassLimitedContext(JSContext *ctx, const char *input, size_t i
 // then the global object (var/function)
 JSValue JS_GetGlobalLexicalOrVar(JSContext *ctx, const char *name, size_t name_len);
 
+// Get/set the context's Math.random() PRNG state (the single 64-bit xorshift64* seed used by the Math.random intrinsic)
+// - Exposed so the host can make Math.random() deterministic across a save/restore: capture at save time, restore on load,
+//   and a resumed context continues the identical Math.random() sequence instead of the wall-clock seed from js_random_init
+uint64_t JS_GetRandomState(JSContext *ctx);
+void JS_SetRandomState(JSContext *ctx, uint64_t state);
+
+
 #ifdef __cplusplus
 } /* extern "C" { */
 #endif
