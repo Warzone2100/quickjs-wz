@@ -146,3 +146,27 @@ JSValue JS_GetGlobalLexicalOrVar(JSContext *ctx, const char *name, size_t name_l
 	JS_FreeAtom(ctx, atom);
 	return ret;
 }
+
+// Get/set the context's Math.random() PRNG state
+//
+// ctx->random_state is the entire state of the xorshift64* generator behind the Math.random intrinsic,
+// so this one 64-bit value fully captures/restores the Math.random() sequence
+uint64_t JS_GetRandomState(JSContext *ctx)
+{
+	if (!ctx) {
+		return 0;
+	}
+
+	return ctx->random_state;
+}
+
+void JS_SetRandomState(JSContext *ctx, uint64_t state)
+{
+	if (!ctx) {
+		return;
+	}
+
+	// xorshift64* must never be seeded with 0 (it would yield an all-zero stream)
+	// mirror the guard in js_random_init
+	ctx->random_state = state ? state : 1;
+}
