@@ -169,3 +169,19 @@ else()
 endif()
 
 message(STATUS "QuickJS Library: End")
+
+##################
+# Tests
+# (default ON only when quickjs-wz is the top-level project, i.e. not when included by WZ via add_subdirectory)
+
+if(CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
+	set(_qjs_wz_build_tests_default ON)
+else()
+	set(_qjs_wz_build_tests_default OFF)
+endif()
+option(QUICKJS_WZ_BUILD_TESTS "Build the quickjs-wz tests" ${_qjs_wz_build_tests_default})
+
+if(QUICKJS_WZ_BUILD_TESTS)
+	enable_testing()
+	add_subdirectory(tests)
+endif()
