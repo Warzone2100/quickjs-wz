@@ -68,7 +68,7 @@
 
 /* define to include Atomics.* operations which depend on the OS
    threads */
-#if !defined(__EMSCRIPTEN__)
+#if !defined(__EMSCRIPTEN__) && !defined(QJS_DISABLE_ATOMICS)
 #define CONFIG_ATOMICS
 #endif
 
