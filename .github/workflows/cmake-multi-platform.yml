@@ -8,6 +8,7 @@ on:
 
 jobs:
   build:
+    name: ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
 
     strategy:
@@ -16,25 +17,37 @@ jobs:
 
       matrix:
         include:
-          - os: windows-latest
+          - name: MSVC Win32
+            os: windows-latest
             c_compiler: cl
             cpp_compiler: cl
             architecture: Win32
-          - os: windows-latest
+          - name: MSVC x64
+            os: windows-latest
             c_compiler: cl
             cpp_compiler: cl
             architecture: x64
-          - os: windows-latest
+          - name: MSVC arm64
+            # native arm64 runner, so the tests can actually run
+            os: windows-11-arm
             c_compiler: cl
             cpp_compiler: cl
             architecture: arm64
-          - os: ubuntu-latest
+          - name: Ubuntu GCC
+            os: ubuntu-latest
             c_compiler: gcc
             cpp_compiler: g++
-          - os: ubuntu-latest
+          - name: Ubuntu Clang
+            os: ubuntu-latest
             c_compiler: clang
             cpp_compiler: clang++
-          - os: macos-latest
+          - name: Ubuntu arm64 GCC
+            # non-Apple arm64 uses the struct JSValue representation (same as MSVC x64), not NaN-boxing
+            os: ubuntu-24.04-arm
+            c_compiler: gcc
+            cpp_compiler: g++
+          - name: macOS Clang
+            os: macos-latest
             c_compiler: clang
             cpp_compiler: clang++
 
@@ -74,3 +87,29 @@ jobs:
     - name: Build
       # Build your program with the given configuration. Note that --config is needed because the default Windows generator is a multi-config generator (Visual Studio generator).
       run: cmake --build ${{ steps.strings.outputs.build-output-dir }} --config Release
+
+    - name: Test
+      # Note that -C is needed because the default Windows generator is a multi-config generator (Visual Studio generator).
+      run: ctest --test-dir ${{ steps.strings.outputs.build-output-dir }} --build-config Release --output-on-failure
+
+  emscripten:
+    name: Emscripten (latest)
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install Emscripten SDK
+      run: |
+        git clone --depth 1 https://github.com/emscripten-core/emsdk.git "${{ runner.temp }}/emsdk"
+        "${{ runner.temp }}/emsdk/emsdk" install latest
+        "${{ runner.temp }}/emsdk/emsdk" activate latest
+
+    - name: Configure, build & test
+      # The Emscripten toolchain sets CMAKE_CROSSCOMPILING_EMULATOR to node, so ctest runs the tests under node
+      run: |
+        source "${{ runner.temp }}/emsdk/emsdk_env.sh"
+        emcc --version
+        emcmake cmake -B build -DCMAKE_BUILD_TYPE=Release -S "${{ github.workspace }}"
+        cmake --build build
+        ctest --test-dir build --output-on-failure
