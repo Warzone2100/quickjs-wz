@@ -62,11 +62,12 @@ quickjs_apply_patches(
 		"008-freeruntime2.patch"
 		"009-bsd-compile-fixes.patch"
 		"010-unsigned-enum-bitfield.patch"
+		"011-fix-disabled-atomics-build.patch"
 )
 
 # Finally, rename VERSION to VERSION.txt
-if(EXISTS "${_directoryOfThisScript}/../VERSION")
-	file(RENAME "${_directoryOfThisScript}/../VERSION" "${_directoryOfThisScript}/../VERSION.txt")
+if(EXISTS "${_directoryOfThisScript}/../quickjs/VERSION")
+	file(RENAME "${_directoryOfThisScript}/../quickjs/VERSION" "${_directoryOfThisScript}/../quickjs/VERSION.txt")
 endif()
 
 message(STATUS "Finished applying patches.")

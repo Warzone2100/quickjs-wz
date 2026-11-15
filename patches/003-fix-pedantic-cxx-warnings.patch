@@ -9,7 +9,7 @@ diff --git a/quickjs/quickjs.h b/quickjs/quickjs.h
  
  #ifdef __cplusplus
  extern "C" {
-@@ -248,6 +249,38 @@ typedef struct JSValue {
+@@ -261,6 +262,40 @@ typedef struct JSValue {
  
  #define JS_NAN (JSValue){ .u.float64 = JS_FLOAT64_NAN, JS_TAG_FLOAT64 }
  
@@ -21,6 +21,7 @@ diff --git a/quickjs/quickjs.h b/quickjs/quickjs.h
 +static inline JSValue JS_MKPTR(int64_t tag, void *ptr)
 +{
 +    JSValue v;
++    v.u.uint64 = 0; /* match the C compound literal: no uninitialized bytes */
 +    v.u.ptr = ptr;
 +    v.tag = tag;
 +    return v;
@@ -28,7 +29,8 @@ diff --git a/quickjs/quickjs.h b/quickjs/quickjs.h
 +static inline JSValue JS_MKVAL(int64_t tag, int32_t int32)
 +{
 +    JSValue v;
-+    v.u.int32 = int32;
++    /* same as the C macro: use the 64 bit field to avoid uninitialized data */
++    v.u.uint64 = (uint32_t)int32;
 +    v.tag = tag;
 +    return v;
 +}
@@ -48,7 +50,7 @@ diff --git a/quickjs/quickjs.h b/quickjs/quickjs.h
  static inline JSValue __JS_NewFloat64(JSContext *ctx, double d)
  {
      JSValue v;
-@@ -1049,7 +1082,8 @@ static inline JSValue JS_NewCFunctionMagic(JSContext *ctx, JSCFunctionMagic *fun
+@@ -1121,7 +1156,8 @@ static inline JSValue JS_NewCFunctionMagic(JSContext *ctx, JSCFunctionMagic *fun
                                             int length, JSCFunctionEnum cproto, int magic)
  {
      /* Used to squelch a -Wcast-function-type warning. */

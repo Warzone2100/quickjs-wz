@@ -1,43 +1,7 @@
 diff --git a/quickjs/quickjs.c b/quickjs/quickjs.c
 --- a/quickjs/quickjs.c
 +++ b/quickjs/quickjs.c
-@@ -8014,7 +8014,7 @@ static int JS_DefinePrivateField(JSContext *ctx, JSValueConst obj,
-         JS_ThrowTypeErrorNotASymbol(ctx);
-         goto fail;
-     }
--    prop = js_symbol_to_atom(ctx, (JSValue)name);
-+    prop = js_symbol_to_atom(ctx, JS_VALUE_CONST_CAST(name));
-     p = JS_VALUE_GET_OBJ(obj);
-     prs = find_own_property(&pr, p, prop);
-     if (prs) {
-@@ -8045,7 +8045,7 @@ static JSValue JS_GetPrivateField(JSContext *ctx, JSValueConst obj,
-     /* safety check */
-     if (unlikely(JS_VALUE_GET_TAG(name) != JS_TAG_SYMBOL))
-         return JS_ThrowTypeErrorNotASymbol(ctx);
--    prop = js_symbol_to_atom(ctx, (JSValue)name);
-+    prop = js_symbol_to_atom(ctx, JS_VALUE_CONST_CAST(name));
-     p = JS_VALUE_GET_OBJ(obj);
-     prs = find_own_property(&pr, p, prop);
-     if (!prs) {
-@@ -8072,7 +8072,7 @@ static int JS_SetPrivateField(JSContext *ctx, JSValueConst obj,
-         JS_ThrowTypeErrorNotASymbol(ctx);
-         goto fail;
-     }
--    prop = js_symbol_to_atom(ctx, (JSValue)name);
-+    prop = js_symbol_to_atom(ctx, JS_VALUE_CONST_CAST(name));
-     p = JS_VALUE_GET_OBJ(obj);
-     prs = find_own_property(&pr, p, prop);
-     if (!prs) {
-@@ -8171,7 +8171,7 @@ static int JS_CheckBrand(JSContext *ctx, JSValueConst obj, JSValueConst func)
-         return -1;
-     }
-     p = JS_VALUE_GET_OBJ(obj);
--    prs = find_own_property(&pr, p, js_symbol_to_atom(ctx, (JSValue)brand));
-+    prs = find_own_property(&pr, p, js_symbol_to_atom(ctx, JS_VALUE_CONST_CAST(brand)));
-     return (prs != NULL);
- }
- 
-@@ -9999,7 +9999,7 @@ int JS_DefineProperty(JSContext *ctx, JSValueConst this_obj,
+@@ -10661,7 +10661,7 @@ int JS_DefineProperty(JSContext *ctx, JSValueConst this_obj,
                  return -1;
              }
              /* this code relies on the fact that Uint32 are never allocated */
@@ -46,7 +10,7 @@ diff --git a/quickjs/quickjs.c b/quickjs/quickjs.c
              /* prs may have been modified */
              prs = find_own_property(&pr, p, prop);
              assert(prs != NULL);
-@@ -17247,7 +17247,7 @@ static JSValue js_call_c_function(JSContext *ctx, JSValueConst func_obj,
+@@ -18128,7 +18128,7 @@ static JSValue js_call_c_function(JSContext *ctx, JSValueConst func_obj,
      rt->current_stack_frame = sf;
      ctx = p->u.cfunc.realm; /* change the current realm */
      sf->js_mode = 0;
@@ -55,7 +19,7 @@ diff --git a/quickjs/quickjs.c b/quickjs/quickjs.c
      sf->arg_count = argc;
      arg_buf = argv;
  
-@@ -17493,7 +17493,7 @@ static JSValue JS_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
+@@ -18386,7 +18386,7 @@ static JSValue JS_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
      sf->js_mode = b->js_mode;
      arg_buf = argv;
      sf->arg_count = argc;
@@ -64,7 +28,7 @@ diff --git a/quickjs/quickjs.c b/quickjs/quickjs.c
      var_refs = p->u.func.var_refs;
  
      local_buf = alloca(alloca_size);
-@@ -42601,8 +42601,8 @@ static int64_t JS_FlattenIntoArray(JSContext *ctx, JSValueConst target,
+@@ -45117,8 +45117,8 @@ static int64_t JS_FlattenIntoArray(JSContext *ctx, JSValueConst target,
          if (!JS_IsUndefined(mapperFunction)) {
              JSValueConst args[3] = { element, JS_NewInt64(ctx, sourceIndex), source };
              element = JS_Call(ctx, mapperFunction, thisArg, 3, args);
@@ -75,7 +39,7 @@ diff --git a/quickjs/quickjs.c b/quickjs/quickjs.c
              if (JS_IsException(element))
                  return -1;
          }
-@@ -45208,7 +45208,7 @@ static JSValue js_string_match(JSContext *ctx, JSValueConst this_val,
+@@ -48578,7 +48578,7 @@ static JSValue js_string_match(JSContext *ctx, JSValueConst this_val,
          str = js_new_string8(ctx, "g");
          if (JS_IsException(str))
              goto fail;
@@ -84,7 +48,7 @@ diff --git a/quickjs/quickjs.c b/quickjs/quickjs.c
      }
      rx = JS_CallConstructor(ctx, ctx->regexp_ctor, args_len, args);
      JS_FreeValue(ctx, str);
-@@ -51126,7 +51126,7 @@ static JSValue js_weakref_new(JSContext *ctx, JSValueConst val)
+@@ -54698,7 +54698,7 @@ static JSValue js_weakref_new(JSContext *ctx, JSValueConst val)
      } else {
          assert(JS_IsUndefined(val));
      }
@@ -93,7 +57,7 @@ diff --git a/quickjs/quickjs.c b/quickjs/quickjs.c
  }
  
  #define MAGIC_SET (1 << 0)
-@@ -51256,7 +51256,7 @@ static JSValue map_normalize_key(JSContext *ctx, JSValue key)
+@@ -54828,7 +54828,7 @@ static JSValue map_normalize_key(JSContext *ctx, JSValue key)
  
  static JSValueConst map_normalize_key_const(JSContext *ctx, JSValueConst key)
  {
@@ -102,7 +66,7 @@ diff --git a/quickjs/quickjs.c b/quickjs/quickjs.c
  }
  
  /* hash multipliers, same as the Linux kernel (see Knuth vol 3,
-@@ -51689,7 +51689,7 @@ static JSValue js_map_forEach(JSContext *ctx, JSValueConst this_val,
+@@ -55261,7 +55261,7 @@ static JSValue js_map_forEach(JSContext *ctx, JSValueConst this_val,
                  args[0] = args[1];
              else
                  args[0] = JS_DupValue(ctx, mr->value);
@@ -111,7 +75,7 @@ diff --git a/quickjs/quickjs.c b/quickjs/quickjs.c
              ret = JS_Call(ctx, func, this_arg, 3, (JSValueConst *)args);
              JS_FreeValue(ctx, args[0]);
              if (!magic)
-@@ -53406,7 +53406,7 @@ static JSValue js_promise_all(JSContext *ctx, JSValueConst this_val,
+@@ -57620,7 +57620,7 @@ static JSValue js_promise_all(JSContext *ctx, JSValueConst this_val,
                  goto fail_reject;
              }
              resolve_element_data[0] = JS_NewBool(ctx, FALSE);
@@ -120,7 +84,7 @@ diff --git a/quickjs/quickjs.c b/quickjs/quickjs.c
              resolve_element_data[2] = values;
              resolve_element_data[3] = resolving_funcs[is_promise_any];
              resolve_element_data[4] = resolve_element_env;
-@@ -53827,7 +53827,7 @@ static JSValue js_async_from_sync_iterator_unwrap_func_create(JSContext *ctx,
+@@ -58359,7 +58359,7 @@ static JSValue js_async_from_sync_iterator_unwrap_func_create(JSContext *ctx,
  {
      JSValueConst func_data[1];
  
@@ -129,7 +93,7 @@ diff --git a/quickjs/quickjs.c b/quickjs/quickjs.c
      return JS_NewCFunctionData(ctx, js_async_from_sync_iterator_unwrap,
                                 1, 0, 1, func_data);
  }
-@@ -58145,8 +58145,8 @@ static int js_TA_cmp_generic(const void *a, const void *b, void *opaque) {
+@@ -62903,8 +62903,8 @@ static int js_TA_cmp_generic(const void *a, const void *b, void *opaque) {
              cmp = (a_idx > b_idx) - (a_idx < b_idx);
          }
      done:
@@ -143,7 +107,7 @@ diff --git a/quickjs/quickjs.c b/quickjs/quickjs.c
 diff --git a/quickjs/quickjs.h b/quickjs/quickjs.h
 --- a/quickjs/quickjs.h
 +++ b/quickjs/quickjs.h
-@@ -110,6 +110,8 @@ typedef struct JSRefCountHeader {
+@@ -121,6 +121,8 @@ typedef struct JSRefCountHeader {
     for objective C) */
  typedef struct __JSValue *JSValue;
  typedef const struct __JSValue *JSValueConst;
@@ -152,16 +116,16 @@ diff --git a/quickjs/quickjs.h b/quickjs/quickjs.h
  
  #define JS_VALUE_GET_TAG(v) (int)((uintptr_t)(v) & 0xf)
  /* same as JS_VALUE_GET_TAG, but return JS_TAG_FLOAT64 with NaN boxing */
-@@ -147,6 +149,8 @@ static inline JSValue __JS_NewShortBigInt(JSContext *ctx, int32_t d)
+@@ -158,6 +160,8 @@ static inline JSValue __JS_NewShortBigInt(JSContext *ctx, int32_t d)
  typedef uint64_t JSValue;
  
  #define JSValueConst JSValue
 +#define JS_VALUE_CONST_CAST(cVal) cVal
 +#define JS_VALUE_MAKE_CONST(val) val
  
- #define JS_VALUE_GET_TAG(v) (int)((v) >> 32)
+ #define JS_VALUE_GET_TAG(v) (int)((int64_t)(v) >> JS_NAN_BOX_TAG_SHIFT)
  #define JS_VALUE_GET_INT(v) (int)(v)
-@@ -232,6 +236,8 @@ typedef struct JSValue {
+@@ -243,6 +247,8 @@ typedef struct JSValue {
  } JSValue;
  
  #define JSValueConst JSValue
@@ -170,8 +134,8 @@ diff --git a/quickjs/quickjs.h b/quickjs/quickjs.h
  
  #define JS_VALUE_GET_TAG(v) ((int32_t)(v).tag)
  /* same as JS_VALUE_GET_TAG, but return JS_TAG_FLOAT64 with NaN boxing */
-@@ -734,7 +740,7 @@ static inline JSValue JS_DupValue(JSContext *ctx, JSValueConst v)
-         JSRefCountHeader *p = (JSRefCountHeader *)JS_VALUE_GET_PTR(v);
+@@ -773,7 +779,7 @@ static inline JSValue JS_DupValue(JSContext *ctx, JSValueConst v)
+         JSRefCountHeader *p = __js_rc(JS_VALUE_GET_PTR(v));
          p->ref_count++;
      }
 -    return (JSValue)v;
@@ -179,8 +143,8 @@ diff --git a/quickjs/quickjs.h b/quickjs/quickjs.h
  }
  
  static inline JSValue JS_DupValueRT(JSRuntime *rt, JSValueConst v)
-@@ -743,7 +749,7 @@ static inline JSValue JS_DupValueRT(JSRuntime *rt, JSValueConst v)
-         JSRefCountHeader *p = (JSRefCountHeader *)JS_VALUE_GET_PTR(v);
+@@ -782,7 +788,7 @@ static inline JSValue JS_DupValueRT(JSRuntime *rt, JSValueConst v)
+         JSRefCountHeader *p = __js_rc(JS_VALUE_GET_PTR(v));
          p->ref_count++;
      }
 -    return (JSValue)v;

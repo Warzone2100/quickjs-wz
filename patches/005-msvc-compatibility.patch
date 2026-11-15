@@ -15,7 +15,7 @@ diff --git a/quickjs/cutils.c b/quickjs/cutils.c
 diff --git a/quickjs/cutils.h b/quickjs/cutils.h
 --- a/quickjs/cutils.h
 +++ b/quickjs/cutils.h
-@@ -29,17 +29,45 @@
+@@ -29,17 +29,53 @@
  #include <string.h>
  #include <inttypes.h>
  
@@ -34,8 +34,16 @@ diff --git a/quickjs/cutils.h b/quickjs/cutils.h
 +#  define force_inline __forceinline
 +#  define no_inline __declspec(noinline)
 +#  define __maybe_unused
-+#  define __attribute__(x)
-+#  define __attribute(x)
++/* map GNU attributes to MSVC equivalents (instead of silently erasing them):
++   __attribute__((name(args))) -> QJS_MSVC_ATTRIBUTE_name(args)
++   An attribute without a mapping below fails to compile (on purpose) */
++#  define __attribute__(x) QJS_MSVC_ATTRIBUTE x
++#  define __attribute(x) QJS_MSVC_ATTRIBUTE x
++#  define QJS_MSVC_ATTRIBUTE(a) QJS_MSVC_ATTRIBUTE_##a
++#  define QJS_MSVC_ATTRIBUTE_aligned(n) __declspec(align(n))
++#  define QJS_MSVC_ATTRIBUTE_format(...)
++#  define QJS_MSVC_ATTRIBUTE_unused
++#  define QJS_MSVC_ATTRIBUTE_warn_unused_result
 +#else
  #define likely(x)       __builtin_expect(!!(x), 1)
  #define unlikely(x)     __builtin_expect(!!(x), 0)
@@ -61,7 +69,7 @@ diff --git a/quickjs/cutils.h b/quickjs/cutils.h
  #ifndef offsetof
  #define offsetof(type, field) ((size_t) &((type *)0)->field)
  #endif
-@@ -66,6 +94,10 @@ enum {
+@@ -66,6 +102,10 @@ enum {
  };
  #endif
  
@@ -72,7 +80,7 @@ diff --git a/quickjs/cutils.h b/quickjs/cutils.h
  void pstrcpy(char *buf, int buf_size, const char *str);
  char *pstrcat(char *buf, int buf_size, const char *s);
  int strstart(const char *str, const char *val, const char **ptr);
-@@ -128,82 +160,113 @@ static inline int64_t min_int64(int64_t a, int64_t b)
+@@ -128,82 +168,120 @@ static inline int64_t min_int64(int64_t a, int64_t b)
  /* WARNING: undefined if a = 0 */
  static inline int clz32(unsigned int a)
  {
@@ -120,9 +128,16 @@ diff --git a/quickjs/cutils.h b/quickjs/cutils.h
  static inline int ctz64(uint64_t a)
  {
 +#if defined(_MSC_VER) && !defined(__clang__)
++#if INTPTR_MAX == INT64_MAX
 +    unsigned long index;
 +    _BitScanForward64(&index, a);
 +    return index;
++#else
++    if ((uint32_t)a)
++        return ctz32((unsigned)a);
++    else
++        return ctz32((unsigned)(a >> 32)) + 32;
++#endif
 +#else
      return __builtin_ctzll(a);
 +#endif
@@ -238,12 +253,41 @@ diff --git a/quickjs/quickjs.c b/quickjs/quickjs.c
  
  #define OPTIMIZE         1
  #define SHORT_OPCODES    1
--#if defined(EMSCRIPTEN)
-+#if defined(EMSCRIPTEN) || defined(_MSC_VER)
+-#if defined(__EMSCRIPTEN__)
++#if defined(__EMSCRIPTEN__) || defined(_MSC_VER)
  #define DIRECT_DISPATCH  0
  #else
  #define DIRECT_DISPATCH  1
-@@ -1630,17 +1639,39 @@ static inline BOOL js_check_stack_overflow(JSRuntime *rt, size_t alloca_size)
+@@ -319,6 +328,28 @@ typedef struct {
+     JSMallocState malloc_state;
+ } JSMallocContext;
+ 
++/* WZ: compile-time checks (on every compiler) of the allocator layout:
++   user pointers must stay JS_MALLOC_ALIGN aligned (for MSVC this relies on
++   __attribute__((aligned)) -> __declspec(align) in cutils.h), and __js_rc()
++   in quickjs.h requires ref_count to immediately precede user_data */
++#if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L
++#define QJS_WZ_STATIC_ASSERT(cond, name) _Static_assert(cond, #name)
++#else
++#define QJS_WZ_STATIC_ASSERT(cond, name) typedef char qjs_wz_static_assert_##name[(cond) ? 1 : -1]
++#endif
++QJS_WZ_STATIC_ASSERT(sizeof(JSMallocBlockHeader) == offsetof(JSMallocBlockHeader, user_data),
++                     malloc_block_header_size);
++QJS_WZ_STATIC_ASSERT(offsetof(JSMallocBlockHeader, user_data) % JS_MALLOC_ALIGN == 0,
++                     malloc_block_user_data_aligned);
++QJS_WZ_STATIC_ASSERT(offsetof(JSMallocBlockHeader, ref_count) + sizeof(int) == offsetof(JSMallocBlockHeader, user_data),
++                     malloc_block_ref_count_precedes_user_data);
++QJS_WZ_STATIC_ASSERT(offsetof(JSMallocLargeBlockHeader, header) % JS_MALLOC_ALIGN == 0,
++                     malloc_large_block_header_aligned);
++QJS_WZ_STATIC_ASSERT(offsetof(JSMallocArena, blocks) % JS_MALLOC_ALIGN == 0,
++                     malloc_arena_blocks_aligned);
++QJS_WZ_STATIC_ASSERT(offsetof(JSMallocContext, zero_size_block) % JS_MALLOC_ALIGN == 0,
++                     malloc_zero_size_block_aligned);
++
+ /* end JS Malloc */
+ 
+ struct JSRuntime {
+@@ -2085,17 +2116,39 @@ static inline BOOL js_check_stack_overflow(JSRuntime *rt, size_t alloca_size)
      return FALSE;
  }
  #else
@@ -283,7 +327,7 @@ diff --git a/quickjs/quickjs.c b/quickjs/quickjs.c
  }
  #endif
  
-@@ -12421,7 +12452,7 @@ static JSValue js_atof(JSContext *ctx, const char *str, const char **pp,
+@@ -13089,7 +13142,7 @@ static JSValue js_atof(JSContext *ctx, const char *str, const char **pp,
          if (!(flags & ATOD_INT_ONLY) &&
              (atod_type == ATOD_TYPE_FLOAT64) &&
              strstart(p, "Infinity", &p)) {
@@ -292,7 +336,7 @@ diff --git a/quickjs/quickjs.c b/quickjs/quickjs.c
              if (is_neg)
                  d = -d;
              val = JS_NewFloat64(ctx, d);
-@@ -22831,7 +22862,7 @@ static int json_parse_number(JSParseState *s, const uint8_t **pp)
+@@ -24036,7 +24089,7 @@ static int json_parse_number(JSParseState *s, const uint8_t **pp)
      if (!is_digit(*p)) {
          if (s->ext_json) {
              if (strstart((const char *)p, "Infinity", (const char **)&p)) {
@@ -301,7 +345,7 @@ diff --git a/quickjs/quickjs.c b/quickjs/quickjs.c
                  if (*p_start == '-')
                      d = -d;
                  goto done;
-@@ -46266,7 +46297,7 @@ static JSValue js_math_min_max(JSContext *ctx, JSValueConst this_val,
+@@ -49767,7 +49820,7 @@ static JSValue js_math_min_max(JSContext *ctx, JSValueConst this_val,
      uint32_t tag;
  
      if (unlikely(argc == 0)) {
@@ -310,7 +354,7 @@ diff --git a/quickjs/quickjs.c b/quickjs/quickjs.c
      }
  
      tag = JS_VALUE_GET_TAG(argv[0]);
-@@ -54339,7 +54370,7 @@ static const JSCFunctionListEntry js_global_funcs[] = {
+@@ -58863,7 +58916,7 @@ static const JSCFunctionListEntry js_global_funcs[] = {
      JS_CFUNC_MAGIC_DEF("encodeURIComponent", 1, js_global_encodeURI, 1 ),
      JS_CFUNC_DEF("escape", 1, js_global_escape ),
      JS_CFUNC_DEF("unescape", 1, js_global_unescape ),
