@@ -46,6 +46,10 @@
 extern const uint8_t qjsc_repl[];
 extern const uint32_t qjsc_repl_size;
 
+#ifdef CONFIG_TEMPORAL_INTL
+static int enable_experimental = 0;
+#endif
+
 static int eval_buf(JSContext *ctx, const void *buf, int buf_len,
                     const char *filename, int eval_flags)
 {
@@ -113,6 +117,12 @@ static JSContext *JS_NewCustomContext(JSRuntime *rt)
     /* system modules */
     js_init_module_std(ctx, "std");
     js_init_module_os(ctx, "os");
+#ifdef CONFIG_TEMPORAL_INTL
+    if (enable_experimental) {
+        JS_AddIntrinsicTemporal(ctx);
+        JS_AddIntrinsicIntl(ctx);
+    }
+#endif
     return ctx;
 }
 
@@ -139,7 +149,7 @@ static size_t js_trace_malloc_usable_size(const void *ptr)
     return malloc_size(ptr);
 #elif defined(_WIN32)
     return _msize((void *)ptr);
-#elif defined(EMSCRIPTEN)
+#elif defined(__EMSCRIPTEN__)
     return 0;
 #elif defined(__linux__) || defined(__GLIBC__)
     return malloc_usable_size((void *)ptr);
@@ -307,6 +317,9 @@ void help(void)
            "    --no-unhandled-rejection  ignore unhandled promise rejections\n"
            "-s                    strip all the debug info\n"
            "    --strip-source    strip the source code\n"
+#ifdef CONFIG_TEMPORAL_INTL
+           "    --experimental    enable experimental Temporal and Intl support\n"
+#endif
            "-q  --quit         just instantiate the interpreter and quit\n");
     exit(1);
 }
@@ -413,6 +426,12 @@ int main(int argc, char **argv)
                 dump_unhandled_promise_rejection = 0;
                 continue;
             }
+#ifdef CONFIG_TEMPORAL_INTL
+            if (!strcmp(longopt, "experimental")) {
+                enable_experimental = TRUE;
+                continue;
+            }
+#endif     
             if (opt == 'q' || !strcmp(longopt, "quit")) {
                 empty_run++;
                 continue;

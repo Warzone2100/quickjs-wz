@@ -29,10 +29,6 @@
 
 #include "cutils.h"
 
-#if defined(_MSC_VER)
-#include "win32-gettimeofday.c"
-#endif
-
 void pstrcpy(char *buf, int buf_size, const char *str)
 {
     int c;
@@ -319,7 +315,7 @@ int unicode_from_utf8(const uint8_t *p, int max_len, const uint8_t **pp)
 
 #if 0
 
-#if defined(EMSCRIPTEN) || defined(__ANDROID__)
+#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
 
 static void *rqsort_arg;
 static int (*rqsort_cmp)(const void *, const void *, void *);

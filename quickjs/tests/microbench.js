@@ -1114,6 +1114,40 @@ function string_build_large2(n)
     return n * len;
 }
 
+function string_concat(n)
+{
+    var tab, i, len = 50;
+    tab = [];
+    for(i = 0; i < len; i++)
+        tab.push("x" + i);
+    for(i = 0; i < n; i++) {
+        global_res = String.prototype.concat.apply("", tab);
+    }
+    return n * len;
+}
+
+function string_array_join(n)
+{
+    var tab, i, len = 50;
+    tab = [];
+    for(i = 0; i < len; i++)
+        tab.push("x" + i);
+    for(i = 0; i < n; i++) {
+        global_res = tab.join("");
+    }
+    return n * len;
+}
+
+function string_template(n)
+{
+    var i, a;
+    a = "0";
+    for(i = 0; i < n; i++) {
+        global_res = `x${a}x${a}x${a}x${a}x${a}x${a}x${a}x${a}x${a}x${a}x${a}x${a}x${a}x${a}x${a}x${a}x${a}x${a}x${a}x${a}`
+    }
+    return n * 40;
+}
+
 /* sort bench */
 
 function sort_bench(text) {
@@ -1492,6 +1526,9 @@ function main(argc, argv, g)
         string_build4,
         string_build_large1,
         string_build_large2,
+        string_concat,
+        string_array_join,
+        string_template,
         int_to_string,
         int_toString,
         float_to_string,
@@ -1577,8 +1614,14 @@ function main(argc, argv, g)
 }
 
 if (typeof scriptArgs === "undefined") {
-    scriptArgs = [];
-    if (typeof process.argv === "object")
+    if (typeof process !== "undefined" && typeof process.argv === "object") {
+        /* node case */
         scriptArgs = process.argv.slice(1);
+    } else if (typeof arguments !== "undefined") {
+        /* d8 case */
+        scriptArgs = arguments;
+    } else {
+        scriptArgs = [];
+    }
 }
 main(scriptArgs.length, scriptArgs, this);
