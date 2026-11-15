@@ -71,6 +71,12 @@ set(THREADS_PREFER_PTHREAD_FLAG TRUE)
 find_package(Threads REQUIRED)
 target_link_libraries(qjs PRIVATE Threads::Threads)
 
+include(CheckLibraryExists)
+check_library_exists(m pow "" QJS_HAVE_LIBM)
+if(QJS_HAVE_LIBM)
+	target_link_libraries(qjs PRIVATE m)
+endif()
+
 if(HAVE_SYS_TIME_H)
 	target_compile_definitions(qjs PRIVATE QUICKJS_HAVE_SYS_TIME_H)
 endif()
