@@ -26,6 +26,7 @@
 #include "quickjs.h"
 #include "quickjs-limitedcontext.h"
 #include "quickjs-debugger.h"
+#include "quickjs-serialization.h"
 #if defined(_MSC_VER)
 #pragma warning( pop )
 #endif
@@ -137,6 +138,27 @@ int main()
 
     JS_SetRandomState(ctx, 42);
     CHECK(JS_GetRandomState(ctx) == 42);
+
+    // quickjs-serialization (C linkage from C++): build a Map, read its entries back, and check a Date's time value
+    JSValue map = JS_NewMapOrSet(ctx, JS_BUILTIN_OBJECT_KIND_MAP);
+    CHECK(JS_GetBuiltinObjectKind(map) == JS_BUILTIN_OBJECT_KIND_MAP);
+    JSValue key = JS_NewString(ctx, "k");
+    CHECK(JS_MapOrSetAdd(ctx, map, key, JS_NewInt32(ctx, 7)) == 0);
+    JS_FreeValue(ctx, key);
+    JSValue *entries = nullptr;
+    uint32_t count = 0;
+    CHECK(JS_GetMapOrSetEntries(ctx, map, &entries, &count) == 0 && count == 1);
+    if (count == 1)
+    {
+        CHECK(to_std_string(ctx, entries[0]) == "k");
+        CHECK(JS_ToInt32(ctx, &i, entries[1]) == 0 && i == 7);
+    }
+    JS_FreeMapOrSetEntries(ctx, entries, count);
+    JS_FreeValue(ctx, map);
+    JSValue date = JS_NewDate(ctx, 1234.0);
+    double timeValue = 0;
+    CHECK(JS_SetDateTimeValue(ctx, date, 5678.9) == 0 && JS_GetDateTimeValue(ctx, date, &timeValue) == 0 && timeValue == 5678.0);
+    JS_FreeValue(ctx, date);
 
     JS_FreeContext(ctx);
     int leaks = 0;

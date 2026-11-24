@@ -30,6 +30,7 @@ set(QUICKJS_HEADERS
 	# extensions
 	quickjs-wz-extensions/quickjs-debugger.h
 	quickjs-wz-extensions/quickjs-limitedcontext.h
+	quickjs-wz-extensions/quickjs-serialization.h
 )
 
 set(QUICKJS_SOURCES
@@ -41,6 +42,7 @@ set(QUICKJS_SOURCES
 	# extensions
 	# INCLUDED DIRECTLY IN QUICKJS.C: quickjs-wz-extensions/quickjs-debugger.c
 	# INCLUDED DIRECTLY IN QUICKJS.C: quickjs-wz-extensions/quickjs-limitedcontext.c
+	# INCLUDED DIRECTLY IN QUICKJS.C: quickjs-wz-extensions/quickjs-serialization.c
 )
 
 list(APPEND qjs_defines _GNU_SOURCE)

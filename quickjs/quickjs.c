@@ -65894,3 +65894,4 @@ int JS_AddIntrinsicWeakRef(JSContext *ctx)
 
 #include <quickjs-debugger.c>
 #include <quickjs-limitedcontext.c>
+#include <quickjs-serialization.c>
