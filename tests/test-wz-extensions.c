@@ -14,6 +14,7 @@
 #include "quickjs.h"
 #include "quickjs-limitedcontext.h"
 #include "quickjs-debugger.h"
+#include "quickjs-serialization.h"
 
 static int g_failures = 0;
 static int g_checks = 0;
@@ -334,6 +335,231 @@ static void test_debugger(void)
     CHECK(g_leak_count == 0);
 }
 
+/* ---- Map / Set / Date internal state (quickjs-serialization) ---- */
+
+/* The serialization API, exposed to the test scripts as __ser.* */
+static JSValue ser_kind(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv)
+{
+    (void)this_val; (void)argc;
+    return JS_NewInt32(ctx, (int32_t)JS_GetBuiltinObjectKind(argv[0]));
+}
+
+/* [[key, value], ...] */
+static JSValue ser_entries(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv)
+{
+    JSValue *entries = NULL, arr;
+    uint32_t count = 0, i;
+    (void)this_val; (void)argc;
+    if (JS_GetMapOrSetEntries(ctx, argv[0], &entries, &count))
+        return JS_EXCEPTION;
+    arr = JS_NewArray(ctx);
+    for (i = 0; i < count; i++) {
+        JSValue pair = JS_NewArray(ctx);
+        JS_SetPropertyUint32(ctx, pair, 0, JS_DupValue(ctx, entries[2 * i]));
+        JS_SetPropertyUint32(ctx, pair, 1, JS_DupValue(ctx, entries[2 * i + 1]));
+        JS_SetPropertyUint32(ctx, arr, i, pair);
+    }
+    JS_FreeMapOrSetEntries(ctx, entries, count);
+    return arr;
+}
+
+static JSValue ser_new_map_or_set(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv)
+{
+    int32_t kind = 0;
+    (void)this_val; (void)argc;
+    if (JS_ToInt32(ctx, &kind, argv[0]))
+        return JS_EXCEPTION;
+    return JS_NewMapOrSet(ctx, (JSBuiltinObjectKind)kind);
+}
+
+static JSValue ser_add(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv)
+{
+    (void)this_val; (void)argc;
+    if (JS_MapOrSetAdd(ctx, argv[0], argv[1], argv[2]))
+        return JS_EXCEPTION;
+    return JS_UNDEFINED;
+}
+
+static JSValue ser_get_time(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv)
+{
+    double t = 0;
+    (void)this_val; (void)argc;
+    if (JS_GetDateTimeValue(ctx, argv[0], &t))
+        return JS_EXCEPTION;
+    return JS_NewFloat64(ctx, t);
+}
+
+static JSValue ser_set_time(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv)
+{
+    double t = 0;
+    (void)this_val; (void)argc;
+    if (JS_ToFloat64(ctx, &t, argv[1]) || JS_SetDateTimeValue(ctx, argv[0], t))
+        return JS_EXCEPTION;
+    return JS_UNDEFINED;
+}
+
+static JSValue ser_gc(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv)
+{
+    (void)this_val; (void)argc; (void)argv;
+    JS_RunGC(JS_GetRuntime(ctx));
+    return JS_UNDEFINED;
+}
+
+/* Helpers for the checks. The intrinsic iterators / size getters are captured up front, so that the
+   checks still see the real state after some of them monkeypatch the prototypes. */
+static const char ser_prelude[] =
+    "var K = { OTHER: 0, MAP: 1, SET: 2, WEAKMAP: 3, WEAKSET: 4, DATE: 5 };\n"
+    "var MapIter = Map.prototype[Symbol.iterator], SetIter = Set.prototype[Symbol.iterator];\n"
+    "var mapSize = Object.getOwnPropertyDescriptor(Map.prototype, 'size').get;\n"
+    "var setSize = Object.getOwnPropertyDescriptor(Set.prototype, 'size').get;\n"
+    "var dateGetTime = Date.prototype.getTime;\n"
+    /* observable state: size, entries in iteration order (SameValue), prototype */
+    "function snapshot(m) {\n"
+    "  var isSet = __ser.kind(m) === K.SET, it = (isSet ? SetIter : MapIter).call(m), out = [];\n"
+    "  for (var r = it.next(); !r.done; r = it.next()) out.push(isSet ? [r.value, r.value] : r.value);\n"
+    "  return { size: (isSet ? setSize : mapSize).call(m), entries: out, proto: Object.getPrototypeOf(m) };\n"
+    "}\n"
+    "function sameState(a, b) {\n"
+    "  var sa = snapshot(a), sb = snapshot(b);\n"
+    "  return sa.size === sb.size && sa.proto === sb.proto && sa.entries.length === sb.entries.length\n"
+    "    && sa.entries.every(function (e, i) { return Object.is(e[0], sb.entries[i][0]) && Object.is(e[1], sb.entries[i][1]); });\n"
+    "}\n"
+    /* what a host restore does: an empty Map / Set, the entries in order, then the prototype */
+    "function roundTrip(m) {\n"
+    "  var r = __ser.newMapOrSet(__ser.kind(m));\n"
+    "  __ser.entries(m).forEach(function (e) { __ser.add(r, e[0], e[1]); });\n"
+    "  if (Object.getPrototypeOf(r) !== Object.getPrototypeOf(m)) Object.setPrototypeOf(r, Object.getPrototypeOf(m));\n"
+    "  return r;\n"
+    "}\n"
+    "function throws(f) { try { f(); return false; } catch (e) { return true; } }\n";
+
+/* Each check is a function body that returns true */
+static const char *const ser_checks[] = {
+    /* classification by internal class */
+    "return __ser.kind(new Map()) === K.MAP && __ser.kind(new Set()) === K.SET && __ser.kind(new Date()) === K.DATE"
+    " && __ser.kind(new WeakMap()) === K.WEAKMAP && __ser.kind(new WeakSet()) === K.WEAKSET;",
+    "return [1, 'x', null, undefined, true, {}, [], function () {}].every(function (v) { return __ser.kind(v) === K.OTHER; });",
+    "return __ser.kind(Object.create(Map.prototype)) === K.OTHER;", /* no [[MapData]] */
+    "var m0 = new Map(); Object.setPrototypeOf(m0, Object.prototype); return __ser.kind(m0) === K.MAP;",
+    "return __ser.kind(new Proxy(new Map(), {})) === K.OTHER;", /* never the target, and no trap runs */
+    "class SubMap extends Map {} return __ser.kind(new SubMap()) === K.MAP;",
+
+    /* iteration order after deletes, re-adds and overwrites, and lockstep afterwards */
+    "var a = {}, b = {}, m = new Map();"
+    " m.set('x', 1).set(a, 2).set(3, b).set('y', 4);"
+    " m.delete(a); m.set(a, 5); m.set('x', 6); m.delete(3); m.set(3, 7);"
+    " var r = roundTrip(m), ok = sameState(m, r);"
+    " [m, r].forEach(function (mm) { mm.delete('x'); mm.set('z', 0); mm.set('x', 1); mm.delete(a); });"
+    " return ok && sameState(m, r);",
+
+    /* a large map, mostly deleted (the hash table only grows; nothing observable differs) */
+    "var big = new Map(), i; for (i = 0; i < 5000; i++) big.set('k' + i, i);"
+    " for (i = 0; i < 5000; i++) if (i % 1000) big.delete('k' + i);"
+    " return big.size === 5 && sameState(big, roundTrip(big));",
+
+    /* -0 is stored as +0, NaN keys, object keys keep their identity, self references */
+    "var o = { tag: 1 }, m = new Map(); m.set(-0, 'z').set(NaN, 'n').set(o, o).set('self', m); m.set(m, 'selfkey');"
+    " var r = roundTrip(m), e = __ser.entries(m);"
+    " return Object.is(e[0][0], 0) && r.get(NaN) === 'n' && r.get(o) === o && r.get('self') === m && r.get(m) === 'selfkey';",
+
+    /* deleted records an iterator still points at ("zombies") are skipped */
+    "var m = new Map([['a', 1], ['b', 2], ['c', 3]]), it = MapIter.call(m); it.next(); m.delete('a');"
+    " var e = __ser.entries(m); return e.length === 2 && e[0][0] === 'b' && sameState(m, roundTrip(m));",
+
+    /* Set, and a Set's values come back as undefined */
+    "var s = new Set([5, 'five', -0, NaN]); s.delete(5); s.add(5); s.add('five');"
+    " return sameState(s, roundTrip(s)) && __ser.entries(s)[0][1] === undefined;",
+
+    /* subclass instances: same internal kind, prototype re-attached by the host */
+    "class Registry extends Map { lookup(k) { return this.has(k) ? this.get(k) : 'none'; } }"
+    " var m = new Registry([['a', 1]]), r = roundTrip(m);"
+    " return r instanceof Registry && r.lookup('a') === 1 && r.lookup('q') === 'none' && sameState(m, r);",
+
+    /* script-visible methods are never called: monkeypatching them changes nothing */
+    "var m = new Map([['a', 1], ['b', 2]]), r;"
+    " var saved = [Map.prototype.forEach, Map.prototype.set, Map.prototype.entries, Map.prototype[Symbol.iterator]];"
+    " Map.prototype.forEach = Map.prototype.set = function () { throw new Error('hijacked'); };"
+    " Map.prototype.entries = Map.prototype[Symbol.iterator] = function* () { yield ['evil', 666]; };"
+    " var ok = !throws(function () { r = roundTrip(m); });"
+    " Map.prototype.forEach = saved[0]; Map.prototype.set = saved[1]; Map.prototype.entries = saved[2]; Map.prototype[Symbol.iterator] = saved[3];"
+    " return ok && sameState(m, r);",
+    "var saved = Date.prototype.getTime; Date.prototype.getTime = function () { return 0; };"
+    " var t = __ser.getTime(new Date(99)); Date.prototype.getTime = saved; return t === 99;",
+
+    /* weak collections are classified, but not read or created */
+    "return throws(function () { __ser.entries(new WeakMap()); }) && throws(function () { __ser.entries(new WeakSet()); })"
+    " && throws(function () { __ser.newMapOrSet(K.WEAKMAP); }) && throws(function () { __ser.add(new WeakMap(), {}, 1); });",
+
+    /* the snapshot stays valid after the source is cleared */
+    "var m = new Map(), i; for (i = 0; i < 100; i++) m.set({ i: i }, { v: i });"
+    " var snap = __ser.entries(m); m.clear(); __ser.gc();"
+    " return snap.length === 100 && snap[99][0].i === 99 && snap[99][1].v === 99;",
+    "return __ser.entries(new Map()).length === 0;",
+
+    /* add(): Map.prototype.set / Set.prototype.add semantics */
+    "var r = __ser.newMapOrSet(K.MAP); __ser.add(r, 'a', 1); __ser.add(r, 'b', 2); __ser.add(r, 'a', 3); __ser.add(r, -0, 'z');"
+    " return JSON.stringify(Array.from(MapIter.call(r))) === '[[\"a\",3],[\"b\",2],[0,\"z\"]]' && Object.is(Array.from(r.keys())[2], 0);",
+    "var s = __ser.newMapOrSet(K.SET); __ser.add(s, 'x', 'ignored'); return s.has('x') && __ser.entries(s)[0][1] === undefined;",
+    "return Object.getPrototypeOf(__ser.newMapOrSet(K.MAP)) === Map.prototype && Object.getPrototypeOf(__ser.newMapOrSet(K.SET)) === Set.prototype;",
+
+    /* everything else is rejected with an exception */
+    "return [function () { __ser.entries({}); }, function () { __ser.entries([]); }, function () { __ser.add({}, 1, 2); },"
+    " function () { __ser.getTime({}); }, function () { __ser.setTime(new Map(), 1); },"
+    " function () { __ser.newMapOrSet(K.DATE); }, function () { __ser.newMapOrSet(K.OTHER); }].every(throws);",
+
+    /* Date time values, read and written in place, with TimeClip */
+    "return [0, -1, 1700000000123, 8.64e15, -8.64e15].every(function (v) { return __ser.getTime(new Date(v)) === v; })"
+    " && Number.isNaN(__ser.getTime(new Date(NaN)));",
+    "var d = new Date(5), same = d; __ser.setTime(d, 1.9); var ok = same.getTime() === 1;"
+    " __ser.setTime(d, -0.5); ok = ok && Object.is(d.getTime(), 0);"
+    " __ser.setTime(d, 9e15); ok = ok && Number.isNaN(d.getTime());"
+    " __ser.setTime(d, 8.64e15); return ok && dateGetTime.call(d) === 8.64e15;",
+    "class Stamp extends Date { label() { return 'T' + this.getTime(); } }"
+    " var s = new Stamp(1234); return __ser.kind(s) === K.DATE && __ser.getTime(s) === 1234 && s.label() === 'T1234';",
+};
+
+static void test_serialization(void)
+{
+    JSRuntime *rt = JS_NewRuntime();
+    JSContext *ctx = new_wz_context(rt, 0);
+    JSValue global = JS_GetGlobalObject(ctx), ser = JS_NewObject(ctx), v;
+    size_t i;
+
+    JS_SetPropertyStr(ctx, ser, "kind", JS_NewCFunction(ctx, ser_kind, "kind", 1));
+    JS_SetPropertyStr(ctx, ser, "entries", JS_NewCFunction(ctx, ser_entries, "entries", 1));
+    JS_SetPropertyStr(ctx, ser, "newMapOrSet", JS_NewCFunction(ctx, ser_new_map_or_set, "newMapOrSet", 1));
+    JS_SetPropertyStr(ctx, ser, "add", JS_NewCFunction(ctx, ser_add, "add", 3));
+    JS_SetPropertyStr(ctx, ser, "getTime", JS_NewCFunction(ctx, ser_get_time, "getTime", 1));
+    JS_SetPropertyStr(ctx, ser, "setTime", JS_NewCFunction(ctx, ser_set_time, "setTime", 2));
+    JS_SetPropertyStr(ctx, ser, "gc", JS_NewCFunction(ctx, ser_gc, "gc", 0));
+    JS_SetPropertyStr(ctx, global, "__ser", ser);
+    JS_FreeValue(ctx, global);
+
+    v = eval_bypass(ctx, ser_prelude);
+    CHECK(!JS_IsException(v));
+    JS_FreeValue(ctx, v);
+
+    for (i = 0; i < sizeof(ser_checks) / sizeof(ser_checks[0]); i++) {
+        /* each check in its own function, so they can reuse names */
+        size_t size = strlen(ser_checks[i]) + 64;
+        char *code = (char *)malloc(size);
+        int32_t ok = 0;
+        CHECK(code != NULL);
+        if (!code)
+            continue;
+        snprintf(code, size, "(function () { %s })() ? 1 : 0", ser_checks[i]);
+        if (eval_int(ctx, code, &ok) != 0 || ok != 1)
+            fprintf(stderr, "  serialization check %d failed: %s\n", (int)i, ser_checks[i]);
+        CHECK(ok == 1);
+        free(code);
+    }
+
+    JS_FreeContext(ctx);
+    g_leak_count = 0;
+    JS_FreeRuntime2(rt, leak_handler);
+    CHECK(g_leak_count == 0);
+}
+
 /* ---- JS_FreeRuntime2 leak reporting ---- */
 
 static void test_free_runtime2_reports_leak(void)
@@ -355,6 +581,7 @@ int main(void)
     test_global_lexical_or_var();
     test_random_state();
     test_debugger();
+    test_serialization();
     test_free_runtime2_reports_leak();
 
     printf("test-wz-extensions: %d checks, %d failures\n", g_checks, g_failures);

@@ -1,10 +1,11 @@
 diff --git a/quickjs/quickjs.c b/quickjs/quickjs.c
 --- a/quickjs/quickjs.c
 +++ b/quickjs/quickjs.c
-@@ -65791,3 +65791,6 @@ int JS_AddIntrinsicWeakRef(JSContext *ctx)
+@@ -65791,3 +65791,7 @@ int JS_AddIntrinsicWeakRef(JSContext *ctx)
      JS_FreeValue(ctx, obj);
      return 0;
  }
 +
 +#include <quickjs-debugger.c>
 +#include <quickjs-limitedcontext.c>
++#include <quickjs-serialization.c>
